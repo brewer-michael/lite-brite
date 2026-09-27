@@ -47,6 +47,7 @@ class App {
   // Incoming MQTT
   void drainInbox();
   void handleMessage(const std::string& slot, const std::string& payload);
+  bool clockTrusted() const;
   void considerSentTime(int64_t sent);
   void handleSetting(std::string_view key, const std::string& payload);
   void runCommand();

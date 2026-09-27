@@ -405,17 +405,18 @@ void App::handleMessage(const std::string& slot, const std::string& payload) {
   stateDirty_ = true;
 }
 
+bool App::clockTrusted() const {
+  return g_rtc.ntpSynced && board::uptimeSeconds() - g_rtc.lastNtpSync < kClockTrustSeconds;
+}
+
 void App::considerSentTime(int64_t sent) {
   // Home Assistant's scripts stamp messages with the time they were sent, so
-  // "now" is at least that. That corrects a clock that ran slow in deep sleep
-  // and gives a rough clock when NTP can't be reached. A clock NTP set
-  // recently is only nudged a little: a big jump means the sender's clock or
-  // format is off, and jumping would expire every waiting message.
+  // "now" is at least that. Use it only to correct a clock that ran a little
+  // slow in deep sleep: a bigger gap means the sender's clock is off, and
+  // following it could expire messages early.
+  if (!clockTrusted()) return;
   const int64_t wall = net::wallClock();
-  if (sent <= wall) return;
-  const bool trusted = g_rtc.ntpSynced && board::uptimeSeconds() - g_rtc.lastNtpSync < kClockTrustSeconds;
-  if (trusted && sent - wall > kMaxSentCorrection) return;
-  net::setClockAtLeast(sent);
+  if (sent > wall && sent - wall <= kMaxSentCorrection) net::setClockAtLeast(sent);
 }
 
 void App::handleSetting(std::string_view key, const std::string& payload) {
@@ -532,7 +533,9 @@ void App::noteMotion(uint32_t now) {
 }
 
 void App::expireMessages() {
-  if (!net::clockIsSet()) return;
+  // Expiry needs a clock NTP vouched for. Without one, fail safe: a stale
+  // reminder may still show, but a valid one is never dropped.
+  if (!clockTrusted()) return;
   for (const std::string& slot : queue_.expired(net::wallClock())) {
     if (const lb::Message* m = queue_.find(slot)) {
       LOG("'%s' expired", slot.c_str());
@@ -546,7 +549,7 @@ void App::expireMessages() {
 void App::queueShowableMessages(uint32_t now) {
   if (wiring_ || !canLight()) return;
   const bool present = lb::someonePresent(awakeState(now));
-  const int64_t clock = net::clockIsSet() ? net::wallClock() : 0;
+  const int64_t clock = clockTrusted() ? net::wallClock() : 0;
   for (const lb::Message* m : queue_.ordered(clock)) {
     if (shownSeqs_.count(m->seq) != 0 || playlist_.contains(m->slot)) continue;
     if (!lb::mayShow(*m, present, board::hasMotionSensor())) continue;
@@ -703,7 +706,7 @@ void App::publishState() {
   s.pending = queue_.size();
   s.usb = usb_;
   s.wakes = g_rtc.wakes;
-  s.clockSet = net::clockIsSet();
+  s.clockSet = clockTrusted();
   s.version = lb::kFirmwareVersion;
   mqtt_.publish(topics_.state(), lb::statePayload(s), true, 1);
   stateDirty_ = false;

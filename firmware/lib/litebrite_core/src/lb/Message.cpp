@@ -141,7 +141,10 @@ bool readText(JsonVariantConst v, std::string& out) {
   return false;
 }
 
-bool readExpiry(JsonVariantConst v, int64_t& out) {
+// Unix seconds (or milliseconds), or an ISO-8601 time that includes its
+// timezone offset. Local times without an offset are rejected: guessing the
+// zone would make messages expire hours early or late.
+bool readTime(JsonVariantConst v, int64_t& out) {
   double d;
   if (readNumber(v, d)) {
     if (d <= 0) {
@@ -153,7 +156,10 @@ bool readExpiry(JsonVariantConst v, int64_t& out) {
     out = static_cast<int64_t>(d);
     return true;
   }
-  if (v.is<const char*>()) return parseIsoTime(trim(v.as<const char*>()), out);
+  if (v.is<const char*>()) {
+    bool hasOffset = false;
+    return parseIsoTime(trim(v.as<const char*>()), out, &hasOffset) && hasOffset;
+  }
   return false;
 }
 
@@ -236,7 +242,7 @@ bool parseEffect(std::string_view text, Effect& out) {
   return false;
 }
 
-bool parseIsoTime(std::string_view s, int64_t& unixSeconds) {
+bool parseIsoTime(std::string_view s, int64_t& unixSeconds, bool* hasOffset) {
   size_t p = 0;
   int year, month, day, hour, minute, second = 0;
   if (!digits(s, p, 4, year) || !expect(s, p, '-') || !digits(s, p, 2, month) || !expect(s, p, '-') ||
@@ -255,6 +261,7 @@ bool parseIsoTime(std::string_view s, int64_t& unixSeconds) {
     }
   }
   int offset = 0;
+  if (hasOffset != nullptr) *hasOffset = p < s.size();
   if (p < s.size()) {
     const char sign = s[p];
     if (sign == 'Z' || sign == 'z') {
@@ -322,11 +329,11 @@ bool parseMessage(std::string_view slot, std::string_view payload, Message& out,
       readClamped(o["priority"], -100, 100, out.priority);
       if (readNumber(o["brightness"], d) && d > 0) readClamped(o["brightness"], 1, 100, out.brightness);
       readBool(o["once"], out.once);
-      if (!o["expires"].isNull() && !readExpiry(o["expires"], out.expires)) {
-        error = "can't read \"expires\" (use unix seconds or an ISO-8601 time)";
+      if (!o["expires"].isNull() && !readTime(o["expires"], out.expires)) {
+        error = "can't read \"expires\" (use unix seconds or an ISO-8601 time with a timezone offset)";
         return false;
       }
-      if (!o["sent"].isNull() && !readExpiry(o["sent"], out.sent)) out.sent = 0;
+      if (!o["sent"].isNull() && !readTime(o["sent"], out.sent)) out.sent = 0;
       if (o["when"].is<const char*>()) parseWhen(o["when"].as<const char*>(), out.when);
       if (o["icon"].is<const char*>()) {
         std::string icon(trim(o["icon"].as<const char*>()));

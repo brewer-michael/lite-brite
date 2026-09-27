@@ -112,12 +112,18 @@ void test_expiry_formats() {
   TEST_ASSERT_EQUAL_INT64(32503680000LL, parse(R"({"text": "a", "expires": 1e308})").expires);
   TEST_ASSERT_EQUAL_INT64(1790553900, parse(R"({"text": "a", "sent": 1790553900})").sent);
   TEST_ASSERT_EQUAL_INT64(0, parse(R"({"text": "a", "sent": "garbage"})").sent);  // ignored, not fatal
+  // A local time with no offset is ambiguous: rejected rather than guessed.
+  TEST_ASSERT_EQUAL_INT64(0, parse(R"({"text": "a", "sent": "2026-09-27T17:05:00"})").sent);
 }
 
 void test_iso_time_parser() {
   int64_t t = 0;
-  TEST_ASSERT_TRUE(parseIsoTime("2000-02-29T12:00:00", t));
+  bool hasOffset = true;
+  TEST_ASSERT_TRUE(parseIsoTime("2000-02-29T12:00:00", t, &hasOffset));
   TEST_ASSERT_EQUAL_INT64(951825600, t);
+  TEST_ASSERT_FALSE(hasOffset);
+  TEST_ASSERT_TRUE(parseIsoTime("2000-02-29T12:00:00Z", t, &hasOffset));
+  TEST_ASSERT_TRUE(hasOffset);
   TEST_ASSERT_TRUE(parseIsoTime("1970-01-01 00:00", t));
   TEST_ASSERT_EQUAL_INT64(0, t);
   TEST_ASSERT_FALSE(parseIsoTime("2026-13-01T00:00:00", t));
@@ -146,6 +152,7 @@ void test_rejected_payloads() {
   TEST_ASSERT_EQUAL_STRING("empty text", parseError(R"({"text": "   "})").c_str());
   TEST_ASSERT_TRUE(parseError("{\"text\": ").rfind("invalid JSON", 0) == 0);
   TEST_ASSERT_TRUE(parseError(R"({"text": "a", "expires": "someday"})").rfind("can't read", 0) == 0);
+  TEST_ASSERT_TRUE(parseError(R"({"text": "a", "expires": "2026-09-27T17:05:00"})").rfind("can't read", 0) == 0);
 }
 
 void test_long_text_is_truncated_on_a_character_boundary() {

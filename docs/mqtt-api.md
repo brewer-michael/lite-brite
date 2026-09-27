@@ -61,8 +61,8 @@ or a JSON object:
 | `priority` | `0` | -100 to 100; higher shows first |
 | `once` | `true` | Clear the message from the broker after it's been shown. With `false` it shows to every visitor until withdrawn or expired. |
 | `when` | `motion` | `motion`: wait until someone is in front of the sign. `now`: show whenever the sign is awake, even without motion (it may be asleep for up to the check-in interval). |
-| `expires` | never | Unix time (seconds, or milliseconds), or an ISO-8601 time like `2026-09-27T17:35:00-07:00`. After this the sign drops it and reports `expired`. Needs the sign's clock; see below. |
-| `sent` | | When the message was published (same formats). The Home Assistant scripts add it. The sign treats it as "the time is now at least this", which corrects a clock that ran slow in deep sleep and gives it a rough clock when NTP can't be reached. |
+| `expires` | never | Unix time (seconds, or milliseconds), or an ISO-8601 time with its timezone offset, like `2026-09-27T17:35:00-07:00` (times without an offset are rejected). After this the sign drops it and reports `expired`. Needs the sign's clock; see below. |
+| `sent` | | When the message was published (same formats). The Home Assistant scripts add it. The sign uses it to correct its clock by up to 10 minutes if it ran slow in deep sleep. |
 | `icon` | | An icon name to put in front of the text |
 
 Unknown fields are ignored and numbers out of range are clamped. A payload the
@@ -70,14 +70,13 @@ sign can't use at all (broken JSON, no text) produces an `invalid` event with
 the reason, so mistakes show up in Home Assistant.
 
 **The clock and expiry:** the sign sets its clock over NTP (`LB_NTP_SERVER`,
-default `pool.ntp.org`; after a failure it waits 2 hours, then 4, 8, 16, and
-then retries daily) and from the `sent` time on incoming messages. A clock
-that NTP has set is only nudged by `sent` (up to 10 minutes), so a sender
-with a wrong clock can't make messages expire early. Until the clock is set, nothing expires. The
-state's `clock` field shows whether it's set. If the sign's network has no
-internet access, point `LB_NTP_SERVER` at a local NTP server (many routers
-run one). Messages carrying `sent` help, but a clock set only from `sent` can
-lag behind, so an expired message may still show once.
+default `pool.ntp.org`; every 6 hours, and after a failure it waits 2 hours,
+then 4, 8, 16, and then retries daily). Expiry only applies while the clock
+has been set by NTP within the last day; the state's `clock` field shows
+this. Without it, messages never expire. That fails safe: a stale reminder may
+still show, but a valid one is never dropped because of a wrong clock. If the
+sign's network has no internet access, point `LB_NTP_SERVER` at a local NTP
+server (many routers run one).
 
 ### Text markup
 

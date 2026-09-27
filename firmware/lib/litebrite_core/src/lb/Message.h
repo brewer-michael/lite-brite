@@ -37,7 +37,7 @@ struct Message {
   bool once = true;               // clear it from the broker after it's been shown
   uint8_t brightness = 0;         // 1-100 %, 0 = device setting
   int64_t expires = 0;            // unix time after which it's dropped, 0 = never
-  int64_t sent = 0;               // unix time it was published, if the sender says
+  int64_t sent = 0;               // unix time it was published, if the sender says (clock drift check)
   ShowWhen when = ShowWhen::Motion;
   uint32_t seq = 0;               // arrival order, assigned by MessageQueue
 };
@@ -56,7 +56,7 @@ bool parseMessage(std::string_view slot, std::string_view payload, Message& out,
 
 // Parses an ISO-8601 timestamp such as "2026-09-27T17:05:00-07:00" or
 // "2026-09-27T17:05:00.123456+00:00" or "...Z" into unix seconds. A timestamp
-// without an offset is taken as UTC.
-bool parseIsoTime(std::string_view text, int64_t& unixSeconds);
+// without an offset is read as UTC and reported through *hasOffset.
+bool parseIsoTime(std::string_view text, int64_t& unixSeconds, bool* hasOffset = nullptr);
 
 }  // namespace lb

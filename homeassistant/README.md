@@ -74,7 +74,9 @@ What happens:
 
 Motion can't tell people apart: if someone else walks past the sign first,
 they get her greeting. The 30-minute expiry keeps a stale greeting from
-lingering. If that matters, add a door sensor or a condition to the automation.
+lingering (it needs the sign to reach an NTP time server; see
+[docs/mqtt-api.md](../docs/mqtt-api.md#messages)). If that matters, add a door
+sensor or a condition to the automation.
 
 ## More
 
