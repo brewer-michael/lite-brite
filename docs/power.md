@@ -75,7 +75,10 @@ Other things that help:
 - **Broker by IP address**, not a `.local` name.
 - **PIR placement**: aim it at the doorway, not at a busy hallway or a
   heating vent, and keep it away from the Wi-Fi antenna. False triggers are
-  the hidden cost.
+  the hidden cost. If the sensor gets stuck on (sun on it, a heater nearby),
+  the firmware limits the damage: a trigger only counts for its first minute,
+  the sign stays awake at most 3 minutes per wake on motion alone, and it
+  naps with growing gaps (8 s up to 64 s) until the sensor resets.
 
 ## Low battery
 
