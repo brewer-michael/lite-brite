@@ -68,6 +68,7 @@
         {{ trigger.to_state.attributes.event_type == 'shown'
            and trigger.to_state.attributes.slot == 'keys' }}
   actions:
-    - action: notify.notify
+    # Your phone's notify action, from the Home Assistant companion app.
+    - action: notify.mobile_app_REPLACE_ME
       data:
         message: "The keys reminder was shown on the entryway sign."
