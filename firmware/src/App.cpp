@@ -310,7 +310,8 @@ void App::onSynced() {
   publishMissingSettings();
   expireMessages();
   publishState();
-  if (!net::clockIsSet() || nowS - g_rtc.lastNtpSync > kNtpResyncSeconds) ntp_.start(LB_NTP_SERVER);
+  // Clock sync waits until nothing is on screen: its DNS lookup blocks.
+  ntpDue_ = !net::clockIsSet() || nowS - g_rtc.lastNtpSync > kNtpResyncSeconds;
   if (wake_ == lb::WakeReason::PowerOn) {
     showNow(internalMessage("_status", ":check: OK!", lb::colors::kGreen, lb::Effect::Scroll, 3));
   }
@@ -435,6 +436,10 @@ void App::stepRunning(uint32_t now) {
   checkMaintenance(now);
   if (otaStarted_) ArduinoOTA.handle();
   queueShowableMessages(now);
+  if (ntpDue_ && !showing_) {
+    ntpDue_ = false;
+    ntp_.start(LB_NTP_SERVER);
+  }
   if (stateDirty_ && !showing_) publishState();
   if (!lb::keepAwake(awakeState(now))) goToSleep();
 }
@@ -685,7 +690,8 @@ lb::AwakeState App::awakeState(uint32_t now) const {
   s.motionSeen = motionSeen_;
   s.lastMotionMs = lastMotionMs_;
   s.lastActivityMs = lastActivityMs_;
-  s.busy = showing_ || otaBusy_ || ntp_.active() || !pendingCommand_.empty() || phase_ != Phase::Running;
+  s.busy = showing_ || otaBusy_ || ntpDue_ || ntp_.active() || !pendingCommand_.empty() ||
+           phase_ != Phase::Running;
   s.alwaysOn = alwaysOn_;
   s.stayAwake = settings_.stayAwake;
   s.lingerS = settings_.linger;

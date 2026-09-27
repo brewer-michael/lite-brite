@@ -27,6 +27,7 @@ LedStrip::LedStrip(int dataPin, int powerPin, bool powerActiveHigh, size_t ledCo
     : dataPin_(dataPin), powerPin_(powerPin), powerActiveHigh_(powerActiveHigh), ledCount_(ledCount) {}
 
 void LedStrip::begin() {
+  if (dataPin_ >= 0) gpio_hold_dis(static_cast<gpio_num_t>(dataPin_));
   if (powerPin_ >= 0) {
     gpio_hold_dis(static_cast<gpio_num_t>(powerPin_));
     pinMode(powerPin_, OUTPUT);
@@ -37,8 +38,9 @@ void LedStrip::begin() {
 
 void LedStrip::holdOffDuringSleep() {
   powerOff();
-  if (powerPin_ < 0) return;
-  gpio_hold_en(static_cast<gpio_num_t>(powerPin_));
+  // Latch the supply switch off and the data line low while the chip sleeps.
+  if (dataPin_ >= 0) gpio_hold_en(static_cast<gpio_num_t>(dataPin_));
+  if (powerPin_ >= 0) gpio_hold_en(static_cast<gpio_num_t>(powerPin_));
   gpio_deep_sleep_hold_en();
 }
 
@@ -50,7 +52,8 @@ void LedStrip::setPower(bool on) {
 void LedStrip::parkDataPin() {
   if (dataPin_ < 0) return;
   const gpio_num_t pin = static_cast<gpio_num_t>(dataPin_);
-  gpio_reset_pin(pin);
+  gpio_reset_pin(pin);  // this enables the pull-up, which could back-power the first LED
+  gpio_pullup_dis(pin);
   gpio_set_direction(pin, GPIO_MODE_OUTPUT);
   gpio_set_level(pin, 0);
 }

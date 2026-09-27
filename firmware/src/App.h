@@ -126,6 +126,7 @@ class App {
   uint32_t wiringStartMs_ = 0;
   uint32_t nextFrameUs_ = 0;
 
+  bool ntpDue_ = false;
   std::string pendingCommand_;
   bool stateDirty_ = true;
   bool otaStarted_ = false;

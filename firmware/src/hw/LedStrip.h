@@ -26,8 +26,9 @@ class LedStrip {
   // Stops RMT, holds the data line low and switches the supply off.
   void powerOff();
 
-  // Latches the supply switch "off" through deep sleep (belt and braces for
-  // the pull resistor on the switch). begin() releases the latch.
+  // Latches the supply switch off and the data line low through deep sleep
+  // (belt and braces for the switch's pull resistor, and no stray pull-up on
+  // the data line into the unpowered panel). begin() releases the latches.
   void holdOffDuringSleep();
 
   bool isOn() const { return on_; }
