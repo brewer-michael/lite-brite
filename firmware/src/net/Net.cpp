@@ -69,6 +69,14 @@ int rssi() { return WiFi.RSSI(); }
 
 bool clockIsSet() { return std::time(nullptr) > kPlausibleTime; }
 
+void setClockAtLeast(int64_t unixSeconds) {
+  if (unixSeconds <= kPlausibleTime || unixSeconds <= static_cast<int64_t>(std::time(nullptr))) return;
+  timeval tv;
+  tv.tv_sec = static_cast<time_t>(unixSeconds);
+  tv.tv_usec = 0;
+  settimeofday(&tv, nullptr);
+}
+
 void NtpClient::start(const char* server) {
   server_ = server;
   attempts_ = 0;

@@ -37,6 +37,7 @@ struct Message {
   bool once = true;               // clear it from the broker after it's been shown
   uint8_t brightness = 0;         // 1-100 %, 0 = device setting
   int64_t expires = 0;            // unix time after which it's dropped, 0 = never
+  int64_t sent = 0;               // unix time it was published, if the sender says
   ShowWhen when = ShowWhen::Motion;
   uint32_t seq = 0;               // arrival order, assigned by MessageQueue
 };

@@ -34,6 +34,7 @@ struct DeviceStatus {
   size_t pending = 0;
   bool usb = false;
   uint32_t wakes = 0;
+  bool clockSet = false;  // message expiry needs the clock
   const char* version = "";
 };
 

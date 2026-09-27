@@ -326,6 +326,7 @@ bool parseMessage(std::string_view slot, std::string_view payload, Message& out,
         error = "can't read \"expires\" (use unix seconds or an ISO-8601 time)";
         return false;
       }
+      if (!o["sent"].isNull() && !readExpiry(o["sent"], out.sent)) out.sent = 0;
       if (o["when"].is<const char*>()) parseWhen(o["when"].as<const char*>(), out.when);
       if (o["icon"].is<const char*>()) {
         std::string icon(trim(o["icon"].as<const char*>()));

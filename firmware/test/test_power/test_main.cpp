@@ -154,6 +154,22 @@ void test_stuck_motion_sensor_cannot_keep_it_awake() {
   TEST_ASSERT_TRUE(keepAwake(s));
 }
 
+void test_timestamps_just_after_now_count_as_now() {
+  AwakeState s = motionWake();
+  s.nowMs = 50000;
+  s.lastMotionMs = 10000;
+  s.lastActivityMs = 50002;  // a show ended after `now` was read
+  TEST_ASSERT_TRUE(keepAwake(s));
+  s.lastActivityMs = 0;
+  s.lastMotionMs = 50001;
+  TEST_ASSERT_TRUE(someonePresent(s));
+  TEST_ASSERT_TRUE(keepAwake(s));
+  // ...but long uptimes (a USB-powered sign) still see old motion as old.
+  s.nowMs = 26u * 24 * 3600 * 1000;  // 26 days
+  s.lastMotionMs = 1000;
+  TEST_ASSERT_FALSE(someonePresent(s));
+}
+
 void test_power_on_stays_up_for_setup() {
   AwakeState s;
   s.reason = WakeReason::PowerOn;
@@ -221,6 +237,7 @@ int main() {
   RUN_TEST(test_timer_wake_sleeps_once_idle);
   RUN_TEST(test_motion_wake_lingers);
   RUN_TEST(test_stuck_motion_sensor_cannot_keep_it_awake);
+  RUN_TEST(test_timestamps_just_after_now_count_as_now);
   RUN_TEST(test_power_on_stays_up_for_setup);
   RUN_TEST(test_always_on_and_maintenance);
   RUN_TEST(test_presence_and_may_show);

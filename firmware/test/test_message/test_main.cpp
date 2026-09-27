@@ -110,6 +110,8 @@ void test_expiry_formats() {
   TEST_ASSERT_EQUAL_INT64(1790553900, parse(R"({"text": "a", "expires": 1790553900000})").expires);
   TEST_ASSERT_EQUAL_INT64(0, parse(R"({"text": "a", "expires": 0})").expires);
   TEST_ASSERT_EQUAL_INT64(32503680000LL, parse(R"({"text": "a", "expires": 1e308})").expires);
+  TEST_ASSERT_EQUAL_INT64(1790553900, parse(R"({"text": "a", "sent": 1790553900})").sent);
+  TEST_ASSERT_EQUAL_INT64(0, parse(R"({"text": "a", "sent": "garbage"})").sent);  // ignored, not fatal
 }
 
 void test_iso_time_parser() {

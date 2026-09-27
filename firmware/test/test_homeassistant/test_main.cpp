@@ -34,6 +34,8 @@ void test_topic_classification() {
   TEST_ASSERT_EQUAL(Topics::Kind::Command, t.classify("lite-brite/entryway/cmd", rest));
   TEST_ASSERT_EQUAL(Topics::Kind::Sync, t.classify("lite-brite/entryway/sync", rest));
   TEST_ASSERT_EQUAL(Topics::Kind::Unknown, t.classify("lite-brite/entryway/msg/bad slot", rest));
+  TEST_ASSERT_EQUAL(Topics::Kind::Unknown, t.classify("lite-brite/entryway/msg/_status", rest));
+  TEST_ASSERT_EQUAL(Topics::Kind::Message, t.classify("lite-brite/entryway/msg/a_b", rest));
   TEST_ASSERT_EQUAL(Topics::Kind::Unknown, t.classify("lite-brite/entryway2/msg/keys", rest));
   TEST_ASSERT_EQUAL(Topics::Kind::Unknown, t.classify("lite-brite/entryway", rest));
   TEST_ASSERT_EQUAL(Topics::Kind::Unknown, t.classify("lite-brite/entryway/state", rest));
@@ -137,6 +139,7 @@ void test_state_payload() {
   TEST_ASSERT_EQUAL_STRING("motion", doc["wake"]);
   TEST_ASSERT_EQUAL_INT(2, doc["pending"].as<int>());
   TEST_ASSERT_FALSE(doc["usb"].as<bool>());
+  TEST_ASSERT_FALSE(doc["clock"].as<bool>());
 
   DeviceStatus unknown;
   JsonDocument doc2;

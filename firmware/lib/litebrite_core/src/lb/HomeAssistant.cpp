@@ -194,6 +194,7 @@ std::string statePayload(const DeviceStatus& status) {
   doc["pending"] = status.pending;
   doc["usb"] = status.usb;
   doc["wakes"] = status.wakes;
+  doc["clock"] = status.clockSet;
   doc["version"] = status.version;
   std::string out;
   serializeJson(doc, out);

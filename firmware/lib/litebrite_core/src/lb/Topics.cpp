@@ -45,7 +45,8 @@ Topics::Kind Topics::classify(std::string_view topic, std::string_view& rest) co
   const std::string_view tail = topic.substr(base_.size() + 1);
   if (startsWith(tail, "msg/")) {
     rest = tail.substr(4);
-    return isValidName(rest) ? Kind::Message : Kind::Unknown;
+    // A leading '_' is reserved for the sign's own status messages.
+    return isValidName(rest) && rest.front() != '_' ? Kind::Message : Kind::Unknown;
   }
   if (startsWith(tail, "config/")) {
     rest = tail.substr(7);

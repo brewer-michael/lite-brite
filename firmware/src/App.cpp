@@ -27,7 +27,7 @@
 namespace {
 
 constexpr uint32_t kRtcMagic = 0x4C425254;  // "LBRT"
-constexpr uint32_t kRtcVersion = 2;
+constexpr uint32_t kRtcVersion = 3;
 constexpr uint32_t kFastConnectMs = 4000;  // then retry with a full scan
 constexpr uint32_t kMqttTimeoutMs = 6000;
 constexpr uint32_t kSyncTimeoutMs = 2000;
@@ -39,6 +39,7 @@ constexpr uint32_t kMaxPirHighMs = 60000;  // a PIR held on longer than this is 
 constexpr uint32_t kExpiryCheckMs = 5000;
 constexpr uint32_t kWiringTestMs = 20000;
 constexpr int64_t kNtpResyncSeconds = 6 * 3600;
+constexpr int64_t kNtpRetrySeconds = 3600;
 constexpr int64_t kDiscoveryRefreshSeconds = 24 * 3600;
 constexpr lb::ColorOrder kColorOrder = lb::ColorOrder::LB_LED_COLOR_ORDER;
 
@@ -53,9 +54,11 @@ struct RtcState {
   uint8_t batteryLevel;
   uint8_t rearmNaps;  // consecutive naps waiting for the PIR to settle
   bool rearmPending;
+  bool motionPending;  // the PIR fired while we were shutting down
   bool discoveryDone;
   int64_t checkInAt;
   int64_t lastNtpSync;
+  int64_t nextNtpAttempt;  // back off while the NTP server can't be reached
   int64_t lastDiscovery;
 };
 static_assert(std::is_trivially_copyable<lb::Settings>::value, "Settings is kept as raw bytes");
@@ -144,6 +147,11 @@ void App::setup() {
     g_rtc.version = kRtcVersion;
     storeSettings(lb::Settings{});
   }
+  if (g_rtc.motionPending) {
+    // Someone walked up just as we went to sleep; we napped a second to reset.
+    g_rtc.motionPending = false;
+    if (wake_ == lb::WakeReason::Timer) wake_ = lb::WakeReason::Motion;
+  }
   ++g_rtc.wakes;
   settings_ = loadSettings();
   board::begin();
@@ -157,10 +165,12 @@ void App::setup() {
     const int64_t remaining = g_rtc.checkInAt - board::rtcSeconds();
     if (remaining > static_cast<int64_t>(kRearmSeconds)) {
       if (board::motionNow()) {
+        // Still triggered. Stay in re-arm mode even when the nap is cut short
+        // by the check-in, so the check-in knows the sensor was stuck.
         if (g_rtc.rearmNaps < 255) ++g_rtc.rearmNaps;
         const uint32_t nap = rearmNapSeconds(g_rtc.rearmNaps);
-        g_rtc.rearmPending = nap < remaining;
-        board::deepSleep(g_rtc.rearmPending ? nap : static_cast<uint32_t>(remaining), false);
+        g_rtc.rearmPending = true;
+        board::deepSleep(nap < remaining ? nap : static_cast<uint32_t>(remaining), false);
       }
       g_rtc.rearmNaps = 0;
       board::deepSleep(static_cast<uint32_t>(remaining), true);
@@ -307,11 +317,13 @@ void App::onSynced() {
       nowS - g_rtc.lastDiscovery > kDiscoveryRefreshSeconds) {
     publishDiscovery();
   }
-  publishMissingSettings();
+  if (synced_) publishMissingSettings();  // after a timeout we can't tell what's missing
   expireMessages();
   publishState();
-  // Clock sync waits until nothing is on screen: its DNS lookup blocks.
-  ntpDue_ = !net::clockIsSet() || nowS - g_rtc.lastNtpSync > kNtpResyncSeconds;
+  // Clock sync waits until nothing is on screen (its DNS lookup blocks) and
+  // backs off while the server can't be reached.
+  const bool clockStale = !net::clockIsSet() || nowS - g_rtc.lastNtpSync > kNtpResyncSeconds;
+  ntpDue_ = clockStale && (wake_ == lb::WakeReason::PowerOn || nowS >= g_rtc.nextNtpAttempt);
   if (wake_ == lb::WakeReason::PowerOn) {
     showNow(internalMessage("_status", ":check: OK!", lb::colors::kGreen, lb::Effect::Scroll, 3));
   }
@@ -357,6 +369,12 @@ void App::handleMessage(const std::string& slot, const std::string& payload) {
     LOG("ignoring '%s': %s", slot.c_str(), error.c_str());
     mqtt_.publish(topics_.event(), lb::invalidEventPayload(slot, error), false, 0);
     return;
+  }
+  if (msg.sent > board::rtcSeconds()) {
+    // Home Assistant's scripts stamp messages with the time they were sent,
+    // and "now" is at least that. Keeps expiry working when NTP can't be
+    // reached, and corrects a clock that ran slow in deep sleep.
+    net::setClockAtLeast(msg.sent);
   }
   if (!queue_.upsert(msg)) {
     LOG("queue full: dropped '%s'", slot.c_str());
@@ -438,13 +456,17 @@ void App::stepRunning(uint32_t now) {
   queueShowableMessages(now);
   if (ntpDue_ && !showing_) {
     ntpDue_ = false;
+    g_rtc.nextNtpAttempt = board::rtcSeconds() + kNtpRetrySeconds;
     ntp_.start(LB_NTP_SERVER);
   }
   if (stateDirty_ && !showing_) publishState();
-  if (!lb::keepAwake(awakeState(now))) goToSleep();
+  if (!lb::keepAwake(awakeState(millis()))) goToSleep();
 }
 
 void App::pollMotion(uint32_t now) {
+  // On a long-running (USB-powered) sign, forget motion from long ago so
+  // millis() wrap-around can never make it look recent.
+  if (motionSeen_ && !pirHigh_ && now - lastMotionMs_ > 600000u) motionSeen_ = false;
   const bool high = board::motionNow();
   if (high && !pirHigh_) pirHighSinceMs_ = now;  // a new trigger
   if (!high) pirStuck_ = false;
@@ -564,7 +586,7 @@ void App::renderFrame() {
 
 void App::onShown(const lb::Message& msg) {
   lastActivityMs_ = millis();
-  if (msg.slot.empty() || msg.slot[0] == '_') return;  // internal status/test messages
+  if (msg.seq == 0) return;  // the sign's own status/test messages (never queued)
   LOG("shown '%s'", msg.slot.c_str());
   shownSeqs_.insert(msg.seq);
   shownAny_ = true;
@@ -594,7 +616,7 @@ void App::clearSlot(const std::string& slot) {
 void App::checkMaintenance(uint32_t now) {
   if (!settings_.stayAwake) return;
   if (!otaStarted_) startOta();
-  if (!alwaysOn_ && now - maintenanceSinceMs_ > LB_MAINTENANCE_MAX_MIN * 60000UL) {
+  if (!alwaysOn_ && static_cast<int32_t>(now - maintenanceSinceMs_) > static_cast<int32_t>(LB_MAINTENANCE_MAX_MIN * 60000UL)) {
     LOG("maintenance mode timed out");
     settings_.stayAwake = false;
     storeSettings(settings_);
@@ -635,6 +657,7 @@ void App::publishState() {
   s.pending = queue_.size();
   s.usb = usb_;
   s.wakes = g_rtc.wakes;
+  s.clockSet = net::clockIsSet();
   s.version = lb::kFirmwareVersion;
   mqtt_.publish(topics_.state(), lb::statePayload(s), true, 1);
   stateDirty_ = false;
@@ -726,8 +749,14 @@ void App::goToSleep() {
   Serial.flush();
 #endif
   if (plan.armMotion && board::motionNow() && plan.timerSeconds > kRearmSeconds) {
-    // The sensor is still triggered; arming it now would wake us at once.
-    // Nap briefly and re-arm once it has settled.
+    if (!pirHigh_) {
+      // It went off during shutdown: someone just walked up. Come straight
+      // back as a motion wake.
+      g_rtc.motionPending = true;
+      board::deepSleep(1, false);
+    }
+    // Still triggered from before; arming it now would wake us at once.
+    // Nap and re-arm once it has settled.
     g_rtc.rearmPending = true;
     board::deepSleep(rearmNapSeconds(0), false);
   }

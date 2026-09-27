@@ -26,8 +26,9 @@ The sign sleeps most of the time. Anything meant for it is published
 ## Messages
 
 One message per **slot** (the last topic segment: 1-32 characters of
-`A-Z a-z 0-9 _ -`). Publishing to a slot replaces what's there; different
-slots queue up. Publishing an empty retained payload withdraws the message.
+`A-Z a-z 0-9 _ -`, not starting with `_`, which is reserved for the sign's own
+status messages). Publishing to a slot replaces what's there; different slots
+queue up. Publishing an empty retained payload withdraws the message.
 
 The payload is either plain text:
 
@@ -60,12 +61,21 @@ or a JSON object:
 | `priority` | `0` | -100 to 100; higher shows first |
 | `once` | `true` | Clear the message from the broker after it's been shown. With `false` it shows to every visitor until withdrawn or expired. |
 | `when` | `motion` | `motion`: wait until someone is in front of the sign. `now`: show whenever the sign is awake, even without motion (it may be asleep for up to the check-in interval). |
-| `expires` | never | Unix time (seconds, or milliseconds), or an ISO-8601 time like `2026-09-27T17:35:00-07:00`. After this the sign drops it and reports `expired`. Needs the sign's clock, which it sets over NTP. |
+| `expires` | never | Unix time (seconds, or milliseconds), or an ISO-8601 time like `2026-09-27T17:35:00-07:00`. After this the sign drops it and reports `expired`. Needs the sign's clock; see below. |
+| `sent` | | When the message was published (same formats). The Home Assistant scripts add it. The sign treats it as "the time is now at least this", which corrects a clock that ran slow in deep sleep and gives it a rough clock when NTP can't be reached. |
 | `icon` | | An icon name to put in front of the text |
 
 Unknown fields are ignored and numbers out of range are clamped. A payload the
 sign can't use at all (broken JSON, no text) produces an `invalid` event with
 the reason, so mistakes show up in Home Assistant.
+
+**The clock and expiry:** the sign sets its clock over NTP (`LB_NTP_SERVER`,
+default `pool.ntp.org`; retried at most hourly if it fails) and from the `sent`
+time on incoming messages. Until the clock is set, nothing expires. The
+state's `clock` field shows whether it's set. If the sign's network has no
+internet access, point `LB_NTP_SERVER` at a local NTP server (many routers
+run one). Messages carrying `sent` help, but a clock set only from `sent` can
+lag behind, so an expired message may still show once.
 
 ### Text markup
 
@@ -104,7 +114,8 @@ publishes its current value when it wakes.
 
 ```json
 {"battery": 87, "voltage": 4.02, "battery_level": "ok", "rssi": -61,
- "wake": "motion", "pending": 1, "usb": false, "wakes": 1234, "version": "0.1.0"}
+ "wake": "motion", "pending": 1, "usb": false, "wakes": 1234, "clock": true,
+ "version": "0.1.0"}
 ```
 
 `battery_level` is `ok`, `low`, `critical`, `empty` or `unknown`; `wake` is
