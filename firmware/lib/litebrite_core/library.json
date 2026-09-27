@@ -1,0 +1,15 @@
+{
+  "name": "litebrite_core",
+  "version": "0.1.0",
+  "description": "Hardware-independent core of the lite-brite LED sign: message model, text layout, rendering, power budgeting and Home Assistant MQTT discovery.",
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [
+    {
+      "owner": "bblanchon",
+      "name": "ArduinoJson",
+      "version": "^7.4.2"
+    }
+  ]
+}

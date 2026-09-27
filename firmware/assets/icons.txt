@@ -1,0 +1,388 @@
+# lite-brite icons
+#
+# 8-pixel-tall pixel-art icons. Use them in message text as :name: (for
+# example ":key: Keys away first!"), or send the matching emoji: the
+# codepoints listed on each header line map to that icon.
+#
+# Palette: "@ <char> <r> <g> <b>  <comment>". Two special characters:
+#   '.' is transparent (LED off), and 't' takes the current text color.
+#
+# Icon format: "== <name> [alias ...] [U+XXXX ...] [U+XXXX-YYYY ...]"
+# followed by exactly 8 rows of palette characters. Every row of an icon
+# must be the same length (the icon width, at most 8).
+#
+# Regenerate the C++ tables after editing:  python3 tools/gen_assets.py
+
+@ w 255 255 255  white
+@ A 150 150 150  light grey
+@ a  70  70  70  dark grey
+@ r 255   0   0  red
+@ m 255  60 150  pink
+@ o 255  90   0  orange
+@ Y 255 150   0  gold
+@ y 255 210   0  yellow
+@ n 150  60  10  brown
+@ g   0 220   0  green
+@ c   0 200 255  cyan
+@ b   0  70 255  blue
+@ p 150   0 255  purple
+
+== key keys U+1F511 U+1F5DD
+........
+.YYY....
+YY.YY...
+Y...YYYY
+YY.YY.YY
+.YYY..Y.
+........
+........
+
+== heart love U+2764 U+2665 U+2763 U+1F495 U+1F496 U+1F497 U+1F498
+.......
+.rr.rr.
+rmrrrrr
+rrrrrrr
+.rrrrr.
+..rrr..
+...r...
+.......
+
+== house home U+1F3E0 U+1F3E1
+...rr...
+..rrrr..
+.rrrrrr.
+rrrrrrrr
+.wwwwww.
+.wwnnww.
+.wwnnww.
+........
+
+== smile happy U+263A U+1F600 U+1F601 U+1F603 U+1F604 U+1F606 U+1F60A U+1F642
+..yyyy..
+.yyyyyy.
+yy.yy.yy
+yyyyyyyy
+y.yyyy.y
+yy....yy
+.yyyyyy.
+..yyyy..
+
+== check ok yes U+2705 U+2713 U+2714 U+2611
+.......g
+......gg
+.....gg.
+g...gg..
+gg.gg...
+.ggg....
+..g.....
+........
+
+== x no cross U+274C U+274E U+2716 U+2717 U+2718
+r.....r
+rr...rr
+.rr.rr.
+..rrr..
+.rr.rr.
+rr...rr
+r.....r
+.......
+
+== bell U+1F514
+...y...
+..yyy..
+.yyyyy.
+.yyyyy.
+.yyyyy.
+yyyyyyy
+...o...
+.......
+
+== star U+2B50 U+2605 U+1F31F
+...y...
+...y...
+yyyyyyy
+.yyyyy.
+..yyy..
+.yy.yy.
+.y...y.
+.......
+
+== sun sunny U+2600 U+1F31E
+y..y..y
+.y.y.y.
+..ooo..
+yyoooyy
+..ooo..
+.y.y.y.
+y..y..y
+.......
+
+== moon night U+1F319 U+1F31B U+263D
+..yyyy.
+.yyy...
+yyy....
+yyy....
+yyy....
+.yyy...
+..yyyy.
+.......
+
+== rain U+1F327
+...ww...
+.wwwwww.
+wwwwwwww
+.wwwwww.
+........
+.b..b..b
+b..b..b.
+........
+
+== umbrella U+2602 U+2614 U+1F302
+...p...
+.ppppp.
+ppppppp
+p..A..p
+...A...
+...A...
+.A.A...
+..A....
+
+== snow snowflake cold U+2744 U+2603 U+26C4
+...c...
+.c.c.c.
+..ccc..
+ccccccc
+..ccc..
+.c.c.c.
+...c...
+.......
+
+== trash bin U+1F5D1
+..AAA..
+AAAAAAA
+.......
+.AAAAA.
+.A.A.A.
+.A.A.A.
+.A.A.A.
+.AAAAA.
+
+== paw dog cat pet U+1F43E U+1F415 U+1F436 U+1F408 U+1F431
+.tt..tt.
+.tt..tt.
+t......t
+t..tt..t
+..tttt..
+.tttttt.
+.tttttt.
+..tttt..
+
+== pill meds U+1F48A
+........
+........
+.rrrwww.
+rrrrwwww
+rrrrwwww
+.rrrwww.
+........
+........
+
+== package parcel box U+1F4E6
+nnnYYnnn
+nnnYYnnn
+nnnnnnnn
+nnnnnnnn
+nnnnnnnn
+nnnnnnnn
+nnnnnnnn
+........
+
+== mail letter U+2709 U+1F4E7 U+1F4E8 U+1F4E9 U+1F4EA U+1F4EB U+1F4EC U+1F4ED
+........
+wwwwwwww
+ww....ww
+w.w..w.w
+w..ww..w
+w......w
+wwwwwwww
+........
+
+== car U+1F697 U+1F698 U+1F699
+........
+..rrrr..
+.rccccr.
+rrrrrrrr
+rrrrrrrr
+.AA..AA.
+........
+........
+
+== warning alert U+26A0 U+1F6A8
+...y...
+..yyy..
+..y.y..
+.yy.yy.
+.yy.yy.
+yyyyyyy
+yyy.yyy
+yyyyyyy
+
+== battery U+1F50B
+........
+wwwwwww.
+wgggg.w.
+wgggg.ww
+wgggg.ww
+wgggg.w.
+wwwwwww.
+........
+
+== battery_low U+1FAAB
+........
+wwwwwww.
+wr....w.
+wr....ww
+wr....ww
+wr....w.
+wwwwwww.
+........
+
+== wifi signal U+1F4F6 U+1F6DC
+......b
+......b
+....b.b
+....b.b
+..b.b.b
+..b.b.b
+b.b.b.b
+.......
+
+== shoe shoes U+1F45F U+1F45E U+1F97E
+........
+.bb.....
+.bbb....
+.bbbbb..
+bbbbbbb.
+bbbbbbbb
+wwwwwwww
+........
+
+== clock time U+23F0 U+231A U+23F2 U+1F550-1F567
+..www..
+.w...w.
+w..r..w
+w..rr.w
+w.....w
+.w...w.
+..www..
+.......
+
+== right U+27A1 U+2192 U+25B6
+...t...
+...tt..
+tttttt.
+ttttttt
+tttttt.
+...tt..
+...t...
+.......
+
+== left U+2B05 U+2190 U+25C0
+...t...
+..tt...
+.tttttt
+ttttttt
+.tttttt
+..tt...
+...t...
+.......
+
+== up U+2B06 U+2191
+...t...
+..ttt..
+.ttttt.
+ttttttt
+..ttt..
+..ttt..
+..ttt..
+.......
+
+== down U+2B07 U+2193
+..ttt..
+..ttt..
+..ttt..
+ttttttt
+.ttttt.
+..ttt..
+...t...
+.......
+
+== lock U+1F512 U+1F510 U+1F513
+..AAA..
+.A...A.
+.A...A.
+yyyyyyy
+yyy.yyy
+yyy.yyy
+yyyyyyy
+.......
+
+== bulb light idea U+1F4A1
+..yyy..
+.yyyyy.
+.yyyyy.
+.yyyyy.
+..yyy..
+..AAA..
+..AAA..
+.......
+
+== drop water U+1F4A7 U+1F4A6
+...b...
+...b...
+..bbb..
+.bbbbb.
+.bbbbb.
+.bbbbb.
+..bbb..
+.......
+
+== gift present U+1F381
+.yy.yy.
+...y...
+rrryrrr
+rrryrrr
+yyyyyyy
+rrryrrr
+rrryrrr
+rrryrrr
+
+== cake birthday U+1F382
+.y.y.y.
+.w.w.w.
+mmmmmmm
+wwwwwww
+mmmmmmm
+wwwwwww
+.......
+.......
+
+== coffee U+2615
+..A..A..
+.A..A...
+..A..A..
+wwwwww..
+wwwwwwww
+wwwwww.w
+wwwwwwww
+.wwww...
+
+== phone U+1F4F1 U+1F4DE U+260E
+AAAAA
+AcccA
+AcccA
+AcccA
+AcccA
+AAAAA
+AA.AA
+AAAAA

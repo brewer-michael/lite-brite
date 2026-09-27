@@ -1,0 +1,195 @@
+# Lite-Brite scripts for Home Assistant.
+#
+# Install: copy this file to <config>/packages/lite_brite.yaml and make sure
+# configuration.yaml loads packages:
+#
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Then restart Home Assistant. You get two scripts you can call from any
+# automation (or from Developer tools > Actions):
+#
+#   script.lite_brite_show   leave a message on the sign
+#   script.lite_brite_clear  take a message back before anyone has seen it
+#
+# Messages are retained MQTT messages. The sign sleeps most of the time to
+# save its battery; it wakes when someone walks up to it, picks up whatever is
+# waiting, and shows it. See docs/mqtt-api.md for every field.
+
+script:
+  lite_brite_show:
+    alias: "Lite-Brite: show a message"
+    icon: mdi:message-flash-outline
+    description: >-
+      Leave a message on a Lite-Brite sign. It appears the next time someone
+      walks up to the sign, or as soon as the sign is awake with "Right away".
+    mode: parallel
+    max: 20
+    fields:
+      message:
+        name: Message
+        description: >-
+          What to show. Add icons with :key: :heart: :house: :smile: :trash:
+          :umbrella: :paw: :pill: :package: (or just use the emoji), and change
+          color mid-message with {red}...{}.
+        required: true
+        example: "Welcome home! :key: Keys away first :smile:"
+        selector:
+          text:
+      slot:
+        name: Slot
+        description: >-
+          A name for this reminder. A new message in the same slot replaces the
+          old one; different slots queue up.
+        default: default
+        example: keys
+        selector:
+          text:
+      color:
+        name: Color
+        default: white
+        selector:
+          select:
+            custom_value: true
+            options:
+              - white
+              - warm white
+              - red
+              - orange
+              - amber
+              - yellow
+              - lime
+              - green
+              - mint
+              - teal
+              - cyan
+              - sky blue
+              - blue
+              - purple
+              - violet
+              - pink
+              - magenta
+              - rainbow
+      effect:
+        name: Effect
+        default: scroll
+        selector:
+          select:
+            options:
+              - label: Scroll
+                value: scroll
+              - label: Flash (grabs attention)
+                value: flash
+              - label: Blink
+                value: blink
+              - label: Pulse
+                value: pulse
+              - label: Static
+                value: static
+      duration:
+        name: Show for
+        description: Seconds to show it. 0 uses the sign's "Message duration" setting.
+        default: 0
+        selector:
+          number:
+            min: 0
+            max: 600
+            unit_of_measurement: s
+            mode: box
+      expires_in:
+        name: Expires after
+        description: Drop the message if nobody has walked past by then. 0 keeps it until it's shown.
+        default: 0
+        selector:
+          number:
+            min: 0
+            max: 10080
+            unit_of_measurement: min
+            mode: box
+      priority:
+        name: Priority
+        description: Higher numbers show first when several messages are waiting.
+        default: 0
+        selector:
+          number:
+            min: -100
+            max: 100
+            mode: box
+      once:
+        name: Clear after showing
+        description: Turn off for a standing reminder that shows every time until you clear it.
+        default: true
+        selector:
+          boolean:
+      when:
+        name: When to show
+        default: motion
+        selector:
+          select:
+            options:
+              - label: When someone walks up (best for battery)
+                value: motion
+              - label: Right away, whenever the sign is awake
+                value: now
+      brightness:
+        name: Brightness
+        description: 0 uses the sign's brightness setting.
+        default: 0
+        selector:
+          number:
+            min: 0
+            max: 100
+            unit_of_measurement: "%"
+      sign:
+        name: Sign
+        description: The sign's device id (LB_DEVICE_ID in the firmware).
+        default: entryway
+        selector:
+          text:
+    sequence:
+      - variables:
+          expires_minutes: "{{ expires_in | default(0) | float(0) }}"
+      - action: mqtt.publish
+        data:
+          topic: "lite-brite/{{ sign | default('entryway') }}/msg/{{ slot | default('default') | slugify }}"
+          retain: true
+          qos: 1
+          payload: >-
+            {{ {
+              'text': message,
+              'color': color | default('white'),
+              'effect': effect | default('scroll'),
+              'duration': duration | default(0) | int(0),
+              'priority': priority | default(0) | int(0),
+              'once': once | default(true) | bool,
+              'when': when | default('motion'),
+              'brightness': brightness | default(0) | int(0),
+              'expires': ((as_timestamp(now()) + expires_minutes * 60) | int)
+                         if expires_minutes > 0 else 0,
+              'sent': as_timestamp(now()) | int
+            } | to_json }}
+
+  lite_brite_clear:
+    alias: "Lite-Brite: clear a message"
+    icon: mdi:message-off-outline
+    description: Take back a message the sign hasn't shown yet (or a standing reminder).
+    mode: parallel
+    fields:
+      slot:
+        name: Slot
+        required: true
+        example: keys
+        selector:
+          text:
+      sign:
+        name: Sign
+        default: entryway
+        selector:
+          text:
+    sequence:
+      - action: mqtt.publish
+        data:
+          topic: "lite-brite/{{ sign | default('entryway') }}/msg/{{ slot | slugify }}"
+          payload: ""
+          retain: true
+          qos: 1
