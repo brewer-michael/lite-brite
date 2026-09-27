@@ -27,10 +27,12 @@ Gotchas:
 - On Xtensa `uint32_t` is `unsigned long`, so `std::min`/`std::max` with mixed types compile on the host but fail on the ESP32. Give explicit template arguments.
 - `RtcState` in `App.cpp` lives in `RTC_NOINIT_ATTR` memory and must stay a trivial type (no constructors or default member initializers), validated by a magic number.
 - Rendering is a pure function of time. The app renders at scheduled frame times, not `millis()`, so scroll steps stay even; frame intervals divide the scroll step exactly.
+- The loop's `now` can be a few ms older than timestamps set later in the same loop iteration. Compare `millis()` values with signed deltas or `elapsed()` in `Policy.cpp`, never a bare unsigned `now - then`.
+- Message slots starting with `_` are reserved for the sign's own status/test messages. Those are never queued, so they have `seq == 0`.
 
 ## What this is
 
-"lite-brite" is a small battery-powered color LED sign that shows instructions when someone arrives home. It will be about 4" across, or a longer, stock-ticker-style scrolling strip if that reads better.
+"lite-brite" is a small battery-powered color LED sign that shows instructions when someone arrives home. The brief allowed about 4" across or a longer, stock-ticker-style scrolling strip, whichever reads better; it is the strip (8×32 LEDs, 32×8 cm), because a 4" panel only fits two or three small letters (see `docs/hardware.md`).
 
 Hard requirements:
 - **Wi-Fi** connectivity.
