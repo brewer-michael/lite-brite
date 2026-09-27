@@ -13,6 +13,7 @@ The firmware is a PlatformIO project in `firmware/` (run `pio` commands from the
 - `pio run -e sim`, then from the repo root `python3 tools/preview.py --out x.gif '<payload>'`: render messages to a GIF with the firmware's own drawing code (needs Pillow).
 - `python3 tools/gen_assets.py`: regenerate the font and icon tables after editing `firmware/assets/*.txt`. CI runs it with `--check`.
 - `python3 tools/check_ha_yaml.py`: checks that the Home Assistant YAML parses.
+- `tools/validate_ha.py --discovery <file>`: validates the scripts, automations, blueprint, payload templates and the discovery payload (`.pio/build/sim/program --discovery`) with a real Home Assistant install. It needs its own Python 3.13+ venv with `pip install homeassistant`; CI runs it.
 - Credentials: copy `firmware/include/secrets.example.h` to `secrets.h` (git-ignored). Builds without it use placeholders and print a warning.
 
 ## Architecture

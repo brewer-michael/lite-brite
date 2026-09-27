@@ -66,7 +66,11 @@ void test_discovery_device_and_origin() {
   TEST_ASSERT_EQUAL_STRING("Entryway sign", doc["dev"]["name"]);
   TEST_ASSERT_EQUAL_STRING("1.2.3", doc["dev"]["sw_version"]);
   TEST_ASSERT_EQUAL_STRING("lite-brite", doc["o"]["name"]);
-  TEST_ASSERT_EQUAL_INT(1, doc["qos"].as<int>());
+  // QoS isn't inherited from the root in device discovery; commands set it.
+  TEST_ASSERT_TRUE(doc["qos"].isNull());
+  TEST_ASSERT_EQUAL_INT(1, doc["cmps"]["message"]["qos"].as<int>());
+  TEST_ASSERT_EQUAL_INT(1, doc["cmps"]["brightness"]["qos"].as<int>());
+  TEST_ASSERT_EQUAL_INT(1, doc["cmps"]["clear"]["qos"].as<int>());
 }
 
 void test_discovery_components() {

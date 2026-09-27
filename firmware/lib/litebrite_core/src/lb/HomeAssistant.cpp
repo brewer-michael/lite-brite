@@ -37,7 +37,6 @@ std::string discoveryPayload(const Topics& topics, const DeviceInfo& info) {
   if (!info.version.empty()) origin["sw_version"] = info.version;
   if (!info.supportUrl.empty()) origin["support_url"] = info.supportUrl;
 
-  doc["qos"] = 1;
   JsonObject cmps = doc["cmps"].to<JsonObject>();
 
   // A text box for quick messages. It shares the "text" slot's retained topic,
@@ -46,6 +45,7 @@ std::string discoveryPayload(const Topics& topics, const DeviceInfo& info) {
   message["command_topic"] = topics.message("text");
   message["state_topic"] = topics.message("text");
   message["retain"] = true;
+  message["qos"] = 1;  // commands: make sure the broker has them
   message["max"] = 255;
   message["icon"] = "mdi:message-text-outline";
 
@@ -56,6 +56,7 @@ std::string discoveryPayload(const Topics& topics, const DeviceInfo& info) {
     c["command_topic"] = topics.setting(s.key);
     c["state_topic"] = topics.setting(s.key);
     c["retain"] = true;
+    c["qos"] = 1;
     c["entity_category"] = "config";
     c["icon"] = s.icon;
     if (sw) {
@@ -90,6 +91,7 @@ std::string discoveryPayload(const Topics& topics, const DeviceInfo& info) {
     c["command_topic"] = topics.command();
     c["payload_press"] = b.payload;
     c["retain"] = true;
+    c["qos"] = 1;
     c["icon"] = b.icon;
     if (b.diagnostic) c["entity_category"] = "diagnostic";
     if (!b.enabled) c["enabled_by_default"] = false;

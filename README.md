@@ -93,9 +93,11 @@ python3 tools/preview.py --out /tmp/test.gif '{"text": "Hi :heart:", "effect": "
 python3 tools/gen_assets.py         # after editing firmware/assets/*.txt
 ```
 
-`tools/preview.py` needs Pillow (`pip install pillow`). CI runs the unit
-tests, both firmware builds, the simulator build and an asset freshness
-check on every push.
+`tools/preview.py` needs Pillow (`pip install pillow`). On every push, CI
+runs the unit tests, both firmware builds and the simulator build, checks the
+generated font tables are fresh, and validates the Home Assistant scripts,
+automations, blueprint and the sign's discovery payload against a real Home
+Assistant install (`tools/validate_ha.py`).
 
 ## Status
 

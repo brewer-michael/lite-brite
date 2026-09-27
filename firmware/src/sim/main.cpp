@@ -17,8 +17,10 @@
 #include <vector>
 
 #include "lb/Canvas.h"
+#include "lb/HomeAssistant.h"
 #include "lb/Message.h"
 #include "lb/Player.h"
+#include "lb/Version.h"
 
 namespace {
 
@@ -28,7 +30,22 @@ void usage() {
   std::fprintf(stderr,
                "usage: program [--width N] [--height N] [--speed PX_PER_S] [--duration S]\n"
                "               [--brightness PCT] --out FILE PAYLOAD [PAYLOAD...]\n"
+               "       program --discovery   (print the Home Assistant discovery payload)\n"
                "PAYLOAD is message JSON or plain text, exactly as Home Assistant would publish it.\n");
+}
+
+// The discovery payload of a fully-equipped sign, for tools/validate_ha.py.
+int printDiscovery() {
+  lb::Topics topics("lite-brite", "entryway");
+  lb::DeviceInfo info;
+  info.name = "Entryway sign";
+  info.model = "LED sign 32x8";
+  info.hardware = "simulator";
+  info.version = lb::kFirmwareVersion;
+  info.supportUrl = lb::kProjectUrl;
+  info.usbSense = true;
+  std::printf("%s\n", lb::discoveryPayload(topics, info).c_str());
+  return 0;
 }
 
 bool readInt(const char* text, int lo, int hi, int& out) {
@@ -70,6 +87,8 @@ int main(int argc, char** argv) {
       defaults.brightness = static_cast<uint8_t>(v);
     } else if (arg == "--out" && hasValue) {
       outPath = argv[++i];
+    } else if (arg == "--discovery") {
+      return printDiscovery();
     } else if (arg == "--help" || arg == "-h") {
       usage();
       return 0;
