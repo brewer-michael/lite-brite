@@ -1,0 +1,122 @@
+blueprint:
+  name: "Lite-Brite: message when someone arrives home"
+  description: >-
+    When a person arrives home, leave a message on a Lite-Brite sign. The sign
+    wakes when someone walks up to it and shows the message (by default with
+    attention-grabbing flashes), then clears it.
+
+
+    Presence tip: the Home Assistant companion app's zone tracking usually marks
+    someone home before they reach the door, so the message is already waiting
+    when they walk in.
+  domain: automation
+  source_url: https://github.com/brewer-michael/lite-brite/blob/main/homeassistant/blueprints/automation/lite_brite/arrival_message.yaml
+  input:
+    person:
+      name: Person
+      description: Who to greet.
+      selector:
+        entity:
+          filter:
+            - domain: person
+    message:
+      name: Message
+      description: >-
+        Icons: :key: :heart: :house: :smile: :shoe: :bag: ... or emoji.
+        Colors mid-message: {green}Keys{} away first.
+      default: "Welcome home! :key: Keys away first :smile:"
+      selector:
+        text:
+    color:
+      name: Color
+      default: orange
+      selector:
+        select:
+          custom_value: true
+          options:
+            - white
+            - warm white
+            - red
+            - orange
+            - amber
+            - yellow
+            - green
+            - cyan
+            - sky blue
+            - blue
+            - purple
+            - pink
+            - rainbow
+    effect:
+      name: Effect
+      default: flash
+      selector:
+        select:
+          options:
+            - label: Flash (grabs attention)
+              value: flash
+            - label: Scroll
+              value: scroll
+            - label: Blink
+              value: blink
+            - label: Pulse
+              value: pulse
+    expires_in:
+      name: Expires after
+      description: >-
+        If nobody walks past the sign within this time, drop the message so it
+        doesn't greet the wrong person hours later. 0 = never.
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 1440
+          unit_of_measurement: min
+          mode: box
+    slot:
+      name: Slot
+      description: One slot per reminder; a new arrival replaces a message still waiting in this slot.
+      default: arrival
+      selector:
+        text:
+    sign:
+      name: Sign
+      description: The sign's device id (LB_DEVICE_ID in the firmware).
+      default: entryway
+      selector:
+        text:
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input person
+    to: home
+    # Don't fire when Home Assistant restarts and states come back.
+    not_from:
+      - unknown
+      - unavailable
+
+variables:
+  sign: !input sign
+  slot: !input slot
+  message: !input message
+  color: !input color
+  effect: !input effect
+  expires_in: !input expires_in
+
+actions:
+  - action: mqtt.publish
+    data:
+      topic: "lite-brite/{{ sign }}/msg/{{ slot | slugify }}"
+      retain: true
+      qos: 1
+      payload: >-
+        {% set mins = expires_in | float(0) %}
+        {{ {
+          'text': message,
+          'color': color,
+          'effect': effect,
+          'expires': ((as_timestamp(now()) + mins * 60) | int) if mins > 0 else 0,
+          'sent': as_timestamp(now()) | int
+        } | to_json }}

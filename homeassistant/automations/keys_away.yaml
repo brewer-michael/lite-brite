@@ -1,0 +1,34 @@
+# The delivery test: when she gets home, the entryway sign flashes a big,
+# friendly reminder to put her keys away first.
+#
+# Needs packages/lite_brite.yaml (for script.lite_brite_show). Paste this into
+# Settings > Automations & scenes > Create automation > Edit in YAML, or add
+# it to automations.yaml, and replace person.REPLACE_ME with her person
+# entity (Settings > People).
+#
+# Prefer clicking to YAML? Import the blueprint in
+# blueprints/automation/lite_brite/arrival_message.yaml instead: same result.
+
+alias: "Lite-Brite: keys away when she gets home"
+description: >-
+  Leaves a flashing "keys away first" message on the entryway sign when she
+  arrives. The sign shows it when she walks in, then clears it.
+mode: single
+triggers:
+  - trigger: state
+    entity_id: person.REPLACE_ME
+    to: home
+    not_from:
+      - unknown
+      - unavailable
+actions:
+  - action: script.lite_brite_show
+    data:
+      slot: keys
+      message: "Welcome home! :key: Keys away first :smile:"
+      color: orange
+      effect: flash
+      duration: 30
+      # If she doesn't come through the door within half an hour, drop it
+      # rather than greet someone else with it later.
+      expires_in: 30

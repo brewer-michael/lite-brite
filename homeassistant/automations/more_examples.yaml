@@ -1,0 +1,74 @@
+# More ideas, all using script.lite_brite_show from packages/lite_brite.yaml.
+# Each is a complete automation; paste one at a time and adjust entity ids.
+
+# A standing reminder for trash night: shows every time someone walks past
+# (once: false) until it's cleared the next morning.
+- alias: "Lite-Brite: trash night"
+  triggers:
+    - trigger: time
+      at: "18:00:00"
+  conditions:
+    - condition: time
+      weekday: [sun]
+  actions:
+    - action: script.lite_brite_show
+      data:
+        slot: trash
+        message: ":trash: Trash night! Bins to the curb"
+        color: green
+        once: false
+        expires_in: 900
+- alias: "Lite-Brite: trash night is over"
+  triggers:
+    - trigger: time
+      at: "08:00:00"
+  actions:
+    - action: script.lite_brite_clear
+      data:
+        slot: trash
+
+# Grab an umbrella when rain is on the way (on the way out, so any motion).
+- alias: "Lite-Brite: umbrella"
+  triggers:
+    - trigger: state
+      entity_id: weather.home
+      to: rainy
+  actions:
+    - action: script.lite_brite_show
+      data:
+        slot: weather
+        message: ":umbrella: {sky blue}Rain today{} - grab an umbrella"
+        color: white
+        expires_in: 240
+
+# A package was delivered: show it as soon as the sign is awake.
+- alias: "Lite-Brite: package"
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.porch_package
+      to: "on"
+  actions:
+    - action: script.lite_brite_show
+      data:
+        slot: package
+        message: ":package: A package is on the porch"
+        color: amber
+        effect: pulse
+        priority: 5
+
+# Tell the phone when the keys reminder was actually seen. The sign reports
+# every message it shows on its "Message" event entity.
+- alias: "Lite-Brite: keys reminder was seen"
+  triggers:
+    - trigger: state
+      entity_id: event.entryway_sign_message
+  conditions:
+    - condition: template
+      value_template: >-
+        {{ trigger.to_state.attributes.event_type == 'shown'
+           and trigger.to_state.attributes.slot == 'keys' }}
+  actions:
+    # Your phone's notify action, from the Home Assistant companion app.
+    - action: notify.mobile_app_REPLACE_ME
+      data:
+        message: "The keys reminder was shown on the entryway sign."

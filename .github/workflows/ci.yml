@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio/libdeps
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+
+      - name: Install tools
+        run: pip install platformio pyyaml
+
+      - name: Generated font and icon tables are up to date
+        run: python3 tools/gen_assets.py --check
+
+      - name: Home Assistant YAML parses
+        run: python3 tools/check_ha_yaml.py
+
+      - name: Unit tests
+        working-directory: firmware
+        run: pio test -e native
+
+      - name: Build firmware and simulator
+        working-directory: firmware
+        run: pio run -e xiao_esp32s3 -e esp32s3_devkitc -e sim
+
+  home-assistant:
+    # Validates the scripts, automations, blueprint, payload templates and the
+    # sign's MQTT discovery payload with Home Assistant's own code.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio/libdeps
+          key: pio-sim-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+
+      - name: Discovery payload from the simulator
+        run: |
+          pip install platformio
+          cd firmware
+          pio run -e sim
+          .pio/build/sim/program --discovery > "$RUNNER_TEMP/discovery.json"
+
+      - name: Validate with Home Assistant
+        run: |
+          python -m venv "$RUNNER_TEMP/ha"
+          "$RUNNER_TEMP/ha/bin/pip" install homeassistant
+          "$RUNNER_TEMP/ha/bin/python" tools/validate_ha.py --discovery "$RUNNER_TEMP/discovery.json"

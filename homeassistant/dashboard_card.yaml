@@ -1,0 +1,20 @@
+# A dashboard card for the sign. Add a card, choose "Manual", paste this.
+# Entity ids assume the default device name "Entryway sign".
+type: entities
+title: Entryway sign
+entities:
+  - entity: text.entryway_sign_message
+    name: Quick message
+  - entity: sensor.entryway_sign_waiting_messages
+  - entity: sensor.entryway_sign_battery
+  - entity: binary_sensor.entryway_sign_motion
+  - entity: button.entryway_sign_clear_messages
+  - entity: button.entryway_sign_show_test_message
+  - type: section
+    label: Settings
+  - entity: number.entryway_sign_brightness
+  - entity: number.entryway_sign_scroll_speed
+  - entity: number.entryway_sign_message_duration
+  - entity: number.entryway_sign_listen_after_motion
+  - entity: number.entryway_sign_check_in_interval
+  - entity: switch.entryway_sign_stay_awake

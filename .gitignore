@@ -1,0 +1,12 @@
+# PlatformIO
+firmware/.pio/
+firmware/.vscode/
+.pio/
+
+# Your Wi-Fi and MQTT credentials
+firmware/include/secrets.h
+
+# Simulator output
+previews/*.frames
+__pycache__/
+*.pyc
