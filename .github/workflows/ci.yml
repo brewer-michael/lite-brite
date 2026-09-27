@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio/libdeps
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+
+      - name: Install tools
+        run: pip install platformio pyyaml
+
+      - name: Generated font and icon tables are up to date
+        run: python3 tools/gen_assets.py --check
+
+      - name: Home Assistant YAML parses
+        run: python3 tools/check_ha_yaml.py
+
+      - name: Unit tests
+        working-directory: firmware
+        run: pio test -e native
+
+      - name: Build firmware and simulator
+        working-directory: firmware
+        run: pio run -e xiao_esp32s3 -e esp32s3_devkitc -e sim

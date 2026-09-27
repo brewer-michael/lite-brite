@@ -12,6 +12,8 @@ namespace lb {
 
 namespace {
 
+constexpr double kLatestExpiry = 32503680000.0;  // year 3000: "effectively never"
+
 std::string_view trim(std::string_view s) {
   auto space = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
   while (!s.empty() && space(s.front())) s.remove_prefix(1);
@@ -147,6 +149,7 @@ bool readExpiry(JsonVariantConst v, int64_t& out) {
       return true;
     }
     if (d > 1e11) d /= 1000.0;  // milliseconds (JavaScript-style timestamps)
+    if (d > kLatestExpiry) d = kLatestExpiry;
     out = static_cast<int64_t>(d);
     return true;
   }
@@ -208,7 +211,7 @@ const char* effectName(Effect effect) {
     case Effect::Flash: return "flash";
     case Effect::Blink: return "blink";
     case Effect::Pulse: return "pulse";
-    case Effect::Static: return "static";
+    case Effect::Ticker: return "ticker";
   }
   return "scroll";
 }
@@ -220,9 +223,9 @@ bool parseEffect(std::string_view text, Effect& out) {
     Effect effect;
   };
   static const Name kNames[] = {
-      {"scroll", Effect::Scroll}, {"ticker", Effect::Scroll}, {"flash", Effect::Flash},
-      {"blink", Effect::Blink},   {"pulse", Effect::Pulse},   {"breathe", Effect::Pulse},
-      {"static", Effect::Static}, {"none", Effect::Static},   {"still", Effect::Static},
+      {"scroll", Effect::Scroll}, {"static", Effect::Scroll}, {"none", Effect::Scroll},
+      {"flash", Effect::Flash},   {"blink", Effect::Blink},   {"pulse", Effect::Pulse},
+      {"breathe", Effect::Pulse}, {"ticker", Effect::Ticker}, {"marquee", Effect::Ticker},
   };
   for (const auto& n : kNames) {
     if (equalsIgnoreCase(text, n.name)) {

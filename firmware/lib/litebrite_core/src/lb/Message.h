@@ -9,11 +9,11 @@
 namespace lb {
 
 enum class Effect : uint8_t {
-  Scroll,  // ticker scroll (short text that fits is shown centered)
-  Flash,   // attention-grabbing inverse flashes, then scroll
+  Scroll,  // text that fits sits still in the middle; longer text scrolls
+  Flash,   // attention-grabbing inverse flashes, then as Scroll
   Blink,   // text blinks on and off
   Pulse,   // text breathes brighter and dimmer
-  Static,  // no motion if it fits, otherwise scrolls
+  Ticker,  // always scrolls in from the right, even short text
 };
 
 enum class ShowWhen : uint8_t {

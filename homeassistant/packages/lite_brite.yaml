@@ -84,8 +84,8 @@ script:
                 value: blink
               - label: Pulse
                 value: pulse
-              - label: Static
-                value: static
+              - label: Ticker (always scrolls in from the right)
+                value: ticker
       duration:
         name: Show for
         description: Seconds to show it. 0 uses the sign's "Message duration" setting.

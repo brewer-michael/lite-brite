@@ -45,7 +45,7 @@ bool parseNumber(std::string_view text, long& out) {
   char* end = nullptr;
   const double d = std::strtod(buf, &end);
   if (end == buf || *end != '\0' || !std::isfinite(d)) return false;
-  out = std::lround(d);
+  out = std::lround(d < -1e9 ? -1e9 : (d > 1e9 ? 1e9 : d));  // callers clamp further
   return true;
 }
 

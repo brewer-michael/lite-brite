@@ -109,6 +109,7 @@ void test_expiry_formats() {
   TEST_ASSERT_EQUAL_INT64(1790553900, parse(R"({"text": "a", "expires": "2026-09-28T00:05:00Z"})").expires);
   TEST_ASSERT_EQUAL_INT64(1790553900, parse(R"({"text": "a", "expires": 1790553900000})").expires);
   TEST_ASSERT_EQUAL_INT64(0, parse(R"({"text": "a", "expires": 0})").expires);
+  TEST_ASSERT_EQUAL_INT64(32503680000LL, parse(R"({"text": "a", "expires": 1e308})").expires);
 }
 
 void test_iso_time_parser() {
@@ -129,7 +130,11 @@ void test_effects() {
   TEST_ASSERT_TRUE(parseEffect("breathe", e));
   TEST_ASSERT_EQUAL(Effect::Pulse, e);
   TEST_ASSERT_FALSE(parseEffect("explode", e));
-  TEST_ASSERT_EQUAL_STRING("static", effectName(Effect::Static));
+  TEST_ASSERT_TRUE(parseEffect("static", e));  // alias: text that fits stays still anyway
+  TEST_ASSERT_EQUAL(Effect::Scroll, e);
+  TEST_ASSERT_TRUE(parseEffect("Ticker", e));
+  TEST_ASSERT_EQUAL(Effect::Ticker, e);
+  TEST_ASSERT_EQUAL_STRING("ticker", effectName(Effect::Ticker));
   TEST_ASSERT_EQUAL(Effect::Scroll, parse(R"({"text": "a", "effect": "explode"})").effect);
 }
 

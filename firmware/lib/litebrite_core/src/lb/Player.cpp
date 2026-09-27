@@ -31,7 +31,8 @@ void MessagePlayer::start(const Message& msg, const PlayDefaults& defaults, int 
   const uint64_t durationUs =
       std::min<uint64_t>(uint64_t(msg.durationS > 0 ? msg.durationS : defaults.durationS) * 1000000u,
                          kMaxShowUs);
-  scrolls_ = textW_ > canvasW_;
+  ticker_ = msg.effect == Effect::Ticker;
+  scrolls_ = ticker_ || textW_ > canvasW_;
   introUs_ = msg.effect == Effect::Flash ? kFlashCount * 2 * kFlashHalfUs : 0;
 
   // One pixel of scroll per step. Frames land on an exact divisor of the step
@@ -43,10 +44,15 @@ void MessagePlayer::start(const Message& msg, const PlayDefaults& defaults, int 
 
   if (scrolls_) {
     frameUs_ = step / framesPerStep;
-    holdUs_ = std::max(kLeadHoldUs, introUs_);
-    firstPassUs_ = holdUs_ + static_cast<uint32_t>(textW_) * step;
     passGapUs_ = msg.effect == Effect::Flash ? 2 * kFlashHalfUs : 0;
     laterPassUs_ = passGapUs_ + static_cast<uint32_t>(canvasW_ + textW_) * step;
+    if (ticker_) {
+      holdUs_ = 0;
+      firstPassUs_ = static_cast<uint32_t>(canvasW_ + textW_) * step;
+    } else {
+      holdUs_ = std::max(kLeadHoldUs, introUs_);
+      firstPassUs_ = holdUs_ + static_cast<uint32_t>(textW_) * step;
+    }
     if (msg.repeat > 0) {
       passes_ = msg.repeat;
     } else if (durationUs <= firstPassUs_) {
@@ -96,7 +102,11 @@ bool MessagePlayer::render(Canvas& canvas, uint32_t tUs) const {
     inverse = tUs < introUs_ && (tUs / kFlashHalfUs) % 2 == 0;
   } else if (tUs < firstPassUs_) {
     inverse = tUs < introUs_ && (tUs / kFlashHalfUs) % 2 == 0;
-    x = tUs < holdUs_ ? 0 : -static_cast<int>((tUs - holdUs_) / stepUs_);
+    if (ticker_) {
+      x = canvasW_ - static_cast<int>(tUs / stepUs_);
+    } else {
+      x = tUs < holdUs_ ? 0 : -static_cast<int>((tUs - holdUs_) / stepUs_);
+    }
   } else {
     const uint32_t inPass = (tUs - firstPassUs_) % laterPassUs_;
     if (inPass < passGapUs_) {

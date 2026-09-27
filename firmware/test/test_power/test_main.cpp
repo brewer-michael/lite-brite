@@ -68,6 +68,8 @@ void test_settings_apply_and_clamp() {
   TEST_ASSERT_EQUAL_UINT8(76, s.brightness);
   TEST_ASSERT_TRUE(applySetting(s, id, "250"));
   TEST_ASSERT_EQUAL_UINT8(100, s.brightness);
+  TEST_ASSERT_TRUE(applySetting(s, id, "1e300"));
+  TEST_ASSERT_EQUAL_UINT8(100, s.brightness);
   TEST_ASSERT_FALSE(applySetting(s, id, "bright"));
   TEST_ASSERT_FALSE(applySetting(s, id, ""));
   TEST_ASSERT_EQUAL_UINT8(100, s.brightness);

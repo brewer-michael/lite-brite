@@ -209,6 +209,24 @@ void test_frame_interval_divides_the_step() {
   }
 }
 
+void test_ticker_scrolls_short_text_in_from_the_right() {
+  MessagePlayer p;
+  PlayDefaults d;
+  d.speed = 25;
+  d.durationS = 1;
+  p.start(msg("Hi", Effect::Ticker), d, 32, 8);
+  TEST_ASSERT_TRUE(p.scrolls());
+  TEST_ASSERT_EQUAL_UINT32(1, p.passes());
+  TEST_ASSERT_EQUAL_UINT32((32 + 7) * 40000u, p.durationUs());
+  Canvas c(32, 8);
+  p.render(c, 0);
+  TEST_ASSERT_EQUAL(0, litPixels(c));
+  p.render(c, 40000);
+  TEST_ASSERT_EQUAL(31, leftmostLitColumn(c));
+  p.render(c, 32 * 40000u);
+  TEST_ASSERT_EQUAL(0, leftmostLitColumn(c));
+}
+
 void test_flash_intro_inverts() {
   MessagePlayer p;
   p.start(msg("Keys!", Effect::Flash), PlayDefaults{}, 32, 8);
@@ -414,6 +432,7 @@ int main() {
   RUN_TEST(test_repeat_overrides_duration);
   RUN_TEST(test_later_passes_enter_from_the_right);
   RUN_TEST(test_frame_interval_divides_the_step);
+  RUN_TEST(test_ticker_scrolls_short_text_in_from_the_right);
   RUN_TEST(test_flash_intro_inverts);
   RUN_TEST(test_blink_and_pulse);
   RUN_TEST(test_background_color);

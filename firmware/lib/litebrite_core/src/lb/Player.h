@@ -32,7 +32,8 @@ constexpr uint32_t kMessageGapUs = 400000;   // blank pause between messages
 // Long text starts left-aligned so the first words are readable immediately,
 // holds for a moment, scrolls off, then re-enters from the right for further
 // passes. Text that fits is centered and doesn't move. "flash" adds three
-// inverse-video flashes at the start and one before each later pass.
+// inverse-video flashes at the start and one before each later pass;
+// "ticker" scrolls everything in from the right, like a stock ticker.
 class MessagePlayer {
  public:
   void start(const Message& msg, const PlayDefaults& defaults, int canvasWidth, int canvasHeight);
@@ -55,6 +56,7 @@ class MessagePlayer {
   int canvasW_ = 0;
   int textW_ = 0;  // canvas pixels
   bool scrolls_ = false;
+  bool ticker_ = false;      // every pass enters from the right
   uint8_t brightness_ = 50;
   uint32_t stepUs_ = 0;      // time per pixel of scroll
   uint32_t introUs_ = 0;     // flash intro length

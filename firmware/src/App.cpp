@@ -291,7 +291,7 @@ void App::onSynced() {
   publishState();
   if (!net::clockIsSet() || nowS - g_rtc.lastNtpSync > kNtpResyncSeconds) ntp_.start(LB_NTP_SERVER);
   if (wake_ == lb::WakeReason::PowerOn) {
-    showNow(internalMessage("_status", ":check: OK!", lb::colors::kGreen, lb::Effect::Static, 3));
+    showNow(internalMessage("_status", ":check: OK!", lb::colors::kGreen, lb::Effect::Scroll, 3));
   }
   setCpuFrequencyMhz(LB_CPU_MHZ_IDLE);
 }
