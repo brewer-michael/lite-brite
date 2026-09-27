@@ -78,7 +78,7 @@ go over Wi-Fi: turn on the sign's **Stay awake** switch in Home Assistant, then
 | [`firmware/src/sim/`](firmware/src/sim) | Desktop simulator |
 | [`firmware/assets/`](firmware/assets) | The font and icons as editable ASCII art |
 | [`homeassistant/`](homeassistant) | Scripts, blueprint, example automations, dashboard card |
-| [`docs/`](docs) | [Hardware](docs/hardware.md), [power](docs/power.md), [MQTT API](docs/mqtt-api.md) |
+| [`docs/`](docs) | [Hardware](docs/hardware.md), [first power-up](docs/bring-up.md), [power](docs/power.md), [MQTT API](docs/mqtt-api.md) |
 | [`tools/`](tools) | Asset generator and GIF previewer |
 
 ## Development
@@ -107,3 +107,4 @@ Assistant discovery) is covered by unit tests. It has not yet been run on
 real hardware: the first build will be the first real-world test of the LED
 timing, the motion wake-up and the battery figures in
 [docs/power.md](docs/power.md), which are estimates.
+[docs/bring-up.md](docs/bring-up.md) walks through checking each part.
