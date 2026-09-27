@@ -27,13 +27,15 @@
 namespace {
 
 constexpr uint32_t kRtcMagic = 0x4C425254;  // "LBRT"
-constexpr uint32_t kRtcVersion = 1;
+constexpr uint32_t kRtcVersion = 2;
 constexpr uint32_t kFastConnectMs = 4000;  // then retry with a full scan
 constexpr uint32_t kMqttTimeoutMs = 6000;
 constexpr uint32_t kSyncTimeoutMs = 2000;
 constexpr uint32_t kFlushTimeoutMs = 2000;
-constexpr uint32_t kRearmSeconds = 8;
+constexpr uint32_t kRearmSeconds = 8;   // first nap while the PIR is still triggered
+constexpr uint32_t kRearmMaxSeconds = 64;  // naps double up to this if it stays triggered
 constexpr uint32_t kMotionReportMs = 10000;
+constexpr uint32_t kMaxPirHighMs = 60000;  // a PIR held on longer than this is ignored
 constexpr uint32_t kExpiryCheckMs = 5000;
 constexpr uint32_t kWiringTestMs = 20000;
 constexpr int64_t kNtpResyncSeconds = 6 * 3600;
@@ -49,6 +51,7 @@ struct RtcState {
   net::ApCache ap;
   uint8_t settings[sizeof(lb::Settings)];
   uint8_t batteryLevel;
+  uint8_t rearmNaps;  // consecutive naps waiting for the PIR to settle
   bool rearmPending;
   bool discoveryDone;
   int64_t checkInAt;
@@ -67,6 +70,13 @@ lb::Settings loadSettings() {
 }
 
 void storeSettings(const lb::Settings& s) { std::memcpy(g_rtc.settings, &s, sizeof(s)); }
+
+// A PIR that stays triggered (sun on the sensor, a heater) would otherwise
+// wake the chip every few seconds all day; back off instead.
+uint32_t rearmNapSeconds(uint8_t naps) {
+  const uint32_t nap = kRearmSeconds << (naps < 4 ? naps : 4);
+  return nap < kRearmMaxSeconds ? nap : kRearmMaxSeconds;
+}
 
 lb::BatteryThresholds thresholds() {
   lb::BatteryThresholds t;
@@ -140,18 +150,24 @@ void App::setup() {
 
   // A timer wake that only exists to re-arm the motion sensor (it was still
   // triggered when we went to sleep). Decide in a few milliseconds, no radio.
+  bool pirWasStuck = false;
   if (wake_ == lb::WakeReason::Timer && g_rtc.rearmPending) {
     g_rtc.rearmPending = false;
+    pirWasStuck = true;
     const int64_t remaining = g_rtc.checkInAt - board::rtcSeconds();
     if (remaining > static_cast<int64_t>(kRearmSeconds)) {
       if (board::motionNow()) {
-        g_rtc.rearmPending = true;
-        board::deepSleep(kRearmSeconds, false);
+        if (g_rtc.rearmNaps < 255) ++g_rtc.rearmNaps;
+        const uint32_t nap = rearmNapSeconds(g_rtc.rearmNaps);
+        g_rtc.rearmPending = nap < remaining;
+        board::deepSleep(g_rtc.rearmPending ? nap : static_cast<uint32_t>(remaining), false);
       }
+      g_rtc.rearmNaps = 0;
       board::deepSleep(static_cast<uint32_t>(remaining), true);
     }
     // Otherwise the regular check-in is due: carry on.
   }
+  g_rtc.rearmNaps = 0;
 
   leds_.begin();
   // Read the battery before the radio starts drawing current.
@@ -160,7 +176,12 @@ void App::setup() {
   g_rtc.batteryLevel = static_cast<uint8_t>(battery_);
   usb_ = board::usbPower();
   alwaysOn_ = LB_ALWAYS_POWERED || usb_;
-  if (wake_ == lb::WakeReason::Motion || board::motionNow()) noteMotion(millis());
+  // Motion counts from each fresh trigger. If the sensor has been on through
+  // the re-arm naps, it isn't someone arriving, so ignore it until it resets.
+  pirHigh_ = board::motionNow();
+  pirStuck_ = pirHigh_ && pirWasStuck;
+  pirHighSinceMs_ = millis();
+  if (wake_ == lb::WakeReason::Motion || (pirHigh_ && !pirStuck_)) noteMotion(millis());
 
   LOG("lite-brite %s: wake=%s #%lu battery=%umV (%s) usb=%d", lb::kFirmwareVersion,
       lb::wakeReasonName(wake_), static_cast<unsigned long>(g_rtc.wakes), batteryMv_,
@@ -174,7 +195,7 @@ void App::setup() {
 
 void App::loop() {
   const uint32_t now = millis();
-  if (board::motionNow()) noteMotion(now);
+  pollMotion(now);
 
   switch (phase_) {
     case Phase::Connecting:
@@ -416,6 +437,14 @@ void App::stepRunning(uint32_t now) {
   queueShowableMessages(now);
   if (stateDirty_ && !showing_) publishState();
   if (!lb::keepAwake(awakeState(now))) goToSleep();
+}
+
+void App::pollMotion(uint32_t now) {
+  const bool high = board::motionNow();
+  if (high && !pirHigh_) pirHighSinceMs_ = now;  // a new trigger
+  if (!high) pirStuck_ = false;
+  pirHigh_ = high;
+  if (high && !pirStuck_ && now - pirHighSinceMs_ < kMaxPirHighMs) noteMotion(now);
 }
 
 void App::noteMotion(uint32_t now) {
@@ -690,11 +719,11 @@ void App::goToSleep() {
 #if LB_DEBUG
   Serial.flush();
 #endif
-  if (plan.armMotion && board::motionNow()) {
+  if (plan.armMotion && board::motionNow() && plan.timerSeconds > kRearmSeconds) {
     // The sensor is still triggered; arming it now would wake us at once.
     // Nap briefly and re-arm once it has settled.
     g_rtc.rearmPending = true;
-    board::deepSleep(kRearmSeconds, false);
+    board::deepSleep(rearmNapSeconds(0), false);
   }
   g_rtc.rearmPending = false;
   board::deepSleep(plan.timerSeconds, plan.armMotion);

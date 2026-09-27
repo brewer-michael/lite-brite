@@ -21,7 +21,7 @@ bool someonePresent(const AwakeState& s) {
 bool keepAwake(const AwakeState& s) {
   if (s.alwaysOn || s.stayAwake || s.busy) return true;
   if (s.reason == WakeReason::PowerOn && s.nowMs < kPowerOnAwakeMs) return true;
-  if (!s.motionSeen) return false;
+  if (!s.motionSeen || s.nowMs >= kMaxLingerAwakeMs) return false;
   const uint32_t since = s.nowMs - std::max(s.lastMotionMs, s.lastActivityMs);
   return since < static_cast<uint32_t>(s.lingerS) * 1000u;
 }

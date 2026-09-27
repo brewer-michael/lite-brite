@@ -336,6 +336,59 @@ void test_playlist_replacing_current_restarts_it() {
   TEST_ASSERT_TRUE(t >= 1520000 + 2000000);  // full duration from the restart
 }
 
+void test_playlist_remove_queued_and_gap() {
+  Playlist pl;
+  PlayDefaults d;
+  d.durationS = 1;
+  pl.configure(d, 32, 8);
+  Message a = msg("A");
+  a.slot = "a";
+  Message b = msg("B");
+  b.slot = "b";
+  pl.add(a);
+  pl.add(b);
+  TEST_ASSERT_TRUE(pl.remove("b"));  // still queued
+  TEST_ASSERT_FALSE(pl.contains("b"));
+  TEST_ASSERT_FALSE(pl.remove("nope"));
+  Canvas c(32, 8);
+  Message done;
+  uint32_t t = 0;
+  bool finished = false;
+  for (; t < 5000000 && !finished; t += 20000) finished = pl.update(c, t, &done);
+  TEST_ASSERT_TRUE(finished);
+  TEST_ASSERT_FALSE(pl.active());
+  // A message added during the gap waits for the gap to end before it starts.
+  pl.add(b);
+  TEST_ASSERT_FALSE(pl.update(c, t, &done));
+  TEST_ASSERT_EQUAL(0, litPixels(c));
+  TEST_ASSERT_NULL(pl.current());
+  pl.update(c, t + kMessageGapUs, &done);
+  TEST_ASSERT_NOT_NULL(pl.current());
+  TEST_ASSERT_EQUAL_STRING("b", pl.current()->slot.c_str());
+  TEST_ASSERT_TRUE(litPixels(c) > 0);
+}
+
+void test_playlist_refreshes_a_queued_copy() {
+  Playlist pl;
+  pl.configure(PlayDefaults{}, 32, 8);
+  Message a = msg("A");
+  a.slot = "a";
+  Message b = msg("old");
+  b.slot = "b";
+  pl.add(a);
+  pl.add(b);
+  b.text = "new";
+  pl.add(b);  // replaces the queued copy instead of queueing twice
+  Canvas c(32, 8);
+  Message done;
+  std::vector<std::string> texts;
+  for (uint32_t t = 0; t < 100000000 && pl.active(); t += 50000) {
+    if (pl.update(c, t, &done)) texts.push_back(done.text);
+  }
+  TEST_ASSERT_EQUAL(2, texts.size());
+  TEST_ASSERT_EQUAL_STRING("new", texts[1].c_str());
+}
+
 // ---- Output ----------------------------------------------------------------
 
 void test_layout_column_major_serpentine() {
@@ -440,6 +493,8 @@ int main() {
   RUN_TEST(test_playlist_plays_in_order_with_gap);
   RUN_TEST(test_playlist_remove_stops_current);
   RUN_TEST(test_playlist_replacing_current_restarts_it);
+  RUN_TEST(test_playlist_remove_queued_and_gap);
+  RUN_TEST(test_playlist_refreshes_a_queued_copy);
   RUN_TEST(test_layout_column_major_serpentine);
   RUN_TEST(test_layout_row_major);
   RUN_TEST(test_brightness_curve);

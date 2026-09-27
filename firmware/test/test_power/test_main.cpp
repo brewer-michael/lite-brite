@@ -142,6 +142,18 @@ void test_motion_wake_lingers() {
   TEST_ASSERT_FALSE(keepAwake(s));
 }
 
+void test_stuck_motion_sensor_cannot_keep_it_awake() {
+  AwakeState s = motionWake();
+  s.nowMs = kMaxLingerAwakeMs - 1;
+  s.lastMotionMs = s.nowMs;  // "motion" right now, as a stuck sensor reports
+  TEST_ASSERT_TRUE(keepAwake(s));
+  s.nowMs = kMaxLingerAwakeMs;
+  s.lastMotionMs = s.nowMs;
+  TEST_ASSERT_FALSE(keepAwake(s));
+  s.busy = true;  // but a message on screen always finishes
+  TEST_ASSERT_TRUE(keepAwake(s));
+}
+
 void test_power_on_stays_up_for_setup() {
   AwakeState s;
   s.reason = WakeReason::PowerOn;
@@ -208,6 +220,7 @@ int main() {
   RUN_TEST(test_setting_table_is_consistent);
   RUN_TEST(test_timer_wake_sleeps_once_idle);
   RUN_TEST(test_motion_wake_lingers);
+  RUN_TEST(test_stuck_motion_sensor_cannot_keep_it_awake);
   RUN_TEST(test_power_on_stays_up_for_setup);
   RUN_TEST(test_always_on_and_maintenance);
   RUN_TEST(test_presence_and_may_show);

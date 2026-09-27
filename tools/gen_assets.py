@@ -264,35 +264,49 @@ def render_icons_cpp(icons: IconSet) -> str:
 
 
 def render_preview(glyphs: list[Glyph], icons: IconSet, out: Path) -> None:
+    """A reference sheet: every glyph, then every icon labelled with its name."""
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image, ImageDraw, ImageFont
     except ImportError as exc:  # pragma: no cover
         raise SystemExit("--preview needs Pillow: pip install pillow") from exc
 
-    cell, gap, per_row = 10, 3, 24
-    items: list[tuple[list[str], dict[str, tuple[int, int, int]]]] = []
-    white = {"#": (255, 255, 255)}
-    for g in glyphs:
-        items.append((g.rows, white))
+    cell, gap = 8, 4
+    background, off, white = (18, 18, 22), (40, 40, 46), (255, 255, 255)
     pal = dict(icons.palette)
-    pal["t"] = (255, 140, 0)
-    for icon in icons.icons:
-        items.append((icon.rows, pal))
-    max_w = max(len(rows[0]) for rows, _ in items)
-    box = (max_w + 1) * cell + gap
-    rows_needed = (len(items) + per_row - 1) // per_row
-    img = Image.new("RGB", (per_row * box + gap, rows_needed * (HEIGHT * cell + gap * 3) + gap), (18, 18, 22))
-    draw = ImageDraw.Draw(img)
-    for i, (rows, colors) in enumerate(items):
-        ox = gap + (i % per_row) * box
-        oy = gap + (i // per_row) * (HEIGHT * cell + gap * 3)
+    pal["t"] = (255, 165, 0)
+    font = ImageFont.load_default()
+
+    def draw_bitmap(draw, ox, oy, rows, colors):
+        r = cell // 2 - 1
         for y, row in enumerate(rows):
             for x, ch in enumerate(row):
-                c = colors.get(ch)
-                fill = c if c else (38, 38, 44)
-                r = cell // 2 - 1
+                c = colors.get(ch, off)
                 cx, cy = ox + x * cell + cell // 2, oy + y * cell + cell // 2
-                draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill)
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
+
+    glyph_box = (max(g.width for g in glyphs) + 1) * cell
+    icon_box = (MAX_ICON_WIDTH + 4) * cell
+    per_row_glyphs, per_row_icons = 24, 12
+    glyph_rows = (len(glyphs) + per_row_glyphs - 1) // per_row_glyphs
+    icon_rows = (len(icons.icons) + per_row_icons - 1) // per_row_icons
+    width = max(per_row_glyphs * glyph_box, per_row_icons * icon_box) + 2 * gap
+    glyph_h = HEIGHT * cell + gap * 2
+    icon_h = HEIGHT * cell + 16 + gap * 2
+    height = gap + glyph_rows * glyph_h + gap * 4 + icon_rows * icon_h
+    img = Image.new("RGB", (width, height), background)
+    draw = ImageDraw.Draw(img)
+    for i, g in enumerate(glyphs):
+        ox = gap + (i % per_row_glyphs) * glyph_box
+        oy = gap + (i // per_row_glyphs) * glyph_h
+        draw_bitmap(draw, ox, oy, g.rows, {"#": white})
+    top = gap + glyph_rows * glyph_h + gap * 4
+    for i, icon in enumerate(icons.icons):
+        ox = gap + (i % per_row_icons) * icon_box
+        oy = top + (i // per_row_icons) * icon_h
+        draw_bitmap(draw, ox + (MAX_ICON_WIDTH - icon.width) * cell // 2, oy, icon.rows, pal)
+        label = f":{icon.name}:"
+        tw = draw.textlength(label, font=font)
+        draw.text((ox + (MAX_ICON_WIDTH * cell - tw) / 2, oy + HEIGHT * cell + 3), label, fill=(170, 170, 180), font=font)
     img.save(out)
     print(f"wrote {out}")
 

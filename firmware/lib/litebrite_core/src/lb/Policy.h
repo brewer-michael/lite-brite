@@ -18,6 +18,9 @@ constexpr uint32_t kPresenceWindowMs = 30000;
 // After power-on (fresh battery, reset button) stay up this long so setup
 // changes made in Home Assistant land right away.
 constexpr uint32_t kPowerOnAwakeMs = 60000;
+// On battery, never stay awake longer than this just because of motion: a
+// motion sensor that's stuck on would otherwise keep the radio up all day.
+constexpr uint32_t kMaxLingerAwakeMs = 180000;
 
 struct AwakeState {
   WakeReason reason = WakeReason::PowerOn;

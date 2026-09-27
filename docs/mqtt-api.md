@@ -69,6 +69,8 @@ the reason, so mistakes show up in Home Assistant.
 
 ### Text markup
 
+![Every glyph and icon](previews/font-and-icons.png)
+
 - `:name:` inserts a built-in icon: `key`, `heart`, `house`, `smile`,
   `check`, `x`, `bell`, `star`, `sun`, `moon`, `rain`, `umbrella`, `snow`,
   `trash`, `paw`, `pill`, `package`, `mail`, `car`, `warning`, `battery`,

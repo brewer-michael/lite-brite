@@ -52,6 +52,7 @@ class App {
 
   // Running
   void stepRunning(uint32_t now);
+  void pollMotion(uint32_t now);
   void noteMotion(uint32_t now);
   void expireMessages();
   void queueShowableMessages(uint32_t now);
@@ -108,6 +109,9 @@ class App {
   uint32_t settingsSeen_ = 0;  // bit per SettingId received this wake
   bool connectFailedShown_ = false;
 
+  bool pirHigh_ = false;
+  bool pirStuck_ = false;       // on since before this wake; wait for it to reset
+  uint32_t pirHighSinceMs_ = 0;
   bool motionSeen_ = false;
   uint32_t lastMotionMs_ = 0;
   uint32_t lastMotionReportMs_ = 0;
