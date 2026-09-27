@@ -27,7 +27,7 @@
 namespace {
 
 constexpr uint32_t kRtcMagic = 0x4C425254;  // "LBRT"
-constexpr uint32_t kRtcVersion = 3;
+constexpr uint32_t kRtcVersion = 4;
 constexpr uint32_t kFastConnectMs = 4000;  // then retry with a full scan
 constexpr uint32_t kMqttTimeoutMs = 6000;
 constexpr uint32_t kSyncTimeoutMs = 2000;
@@ -39,7 +39,9 @@ constexpr uint32_t kMaxPirHighMs = 60000;  // a PIR held on longer than this is 
 constexpr uint32_t kExpiryCheckMs = 5000;
 constexpr uint32_t kWiringTestMs = 20000;
 constexpr int64_t kNtpResyncSeconds = 6 * 3600;
-constexpr int64_t kNtpRetrySeconds = 3600;
+constexpr int64_t kClockTrustSeconds = 24 * 3600;  // an NTP-set clock is trusted this long
+constexpr int64_t kMaxSentCorrection = 600;        // how far `sent` may move a trusted clock
+constexpr int64_t kMotionRewakeGapSeconds = 300;
 constexpr int64_t kDiscoveryRefreshSeconds = 24 * 3600;
 constexpr lb::ColorOrder kColorOrder = lb::ColorOrder::LB_LED_COLOR_ORDER;
 
@@ -53,13 +55,18 @@ struct RtcState {
   uint8_t settings[sizeof(lb::Settings)];
   uint8_t batteryLevel;
   uint8_t rearmNaps;  // consecutive naps waiting for the PIR to settle
+  uint8_t ntpFailures;  // consecutive failed NTP attempts
   bool rearmPending;
   bool motionPending;  // the PIR fired while we were shutting down
   bool discoveryDone;
+  bool ntpSynced;
+  // Times below are board::uptimeSeconds(), which never jumps when the wall
+  // clock is set.
   int64_t checkInAt;
   int64_t lastNtpSync;
-  int64_t nextNtpAttempt;  // back off while the NTP server can't be reached
+  int64_t nextNtpAttempt;
   int64_t lastDiscovery;
+  int64_t lastMotionRewake;
 };
 static_assert(std::is_trivially_copyable<lb::Settings>::value, "Settings is kept as raw bytes");
 static_assert(std::is_trivial<RtcState>::value, "RtcState must not need a constructor");
@@ -76,6 +83,13 @@ void storeSettings(const lb::Settings& s) { std::memcpy(g_rtc.settings, &s, size
 
 // A PIR that stays triggered (sun on the sensor, a heater) would otherwise
 // wake the chip every few seconds all day; back off instead.
+// Wait 2 h, 4 h, 8 h, 16 h, then daily between failed NTP attempts, so a
+// network without internet access doesn't cost every hourly check-in.
+int64_t ntpRetrySeconds(uint8_t failures) {
+  const int64_t delay = int64_t(3600) << (failures < 5 ? failures : 5);
+  return delay < 86400 ? delay : 86400;
+}
+
 uint32_t rearmNapSeconds(uint8_t naps) {
   const uint32_t nap = kRearmSeconds << (naps < 4 ? naps : 4);
   return nap < kRearmMaxSeconds ? nap : kRearmMaxSeconds;
@@ -147,6 +161,17 @@ void App::setup() {
     g_rtc.version = kRtcVersion;
     storeSettings(lb::Settings{});
   }
+  if (wake_ == lb::WakeReason::PowerOn) {
+    // A reset may have restarted the RTC counter while RTC memory survived,
+    // so forget everything timed against it (settings and counters stay).
+    g_rtc.ntpSynced = false;
+    g_rtc.ntpFailures = 0;
+    g_rtc.nextNtpAttempt = 0;
+    g_rtc.lastDiscovery = 0;
+    g_rtc.lastMotionRewake = -kMotionRewakeGapSeconds;
+    g_rtc.rearmPending = false;
+    g_rtc.motionPending = false;
+  }
   if (g_rtc.motionPending) {
     // Someone walked up just as we went to sleep; we napped a second to reset.
     g_rtc.motionPending = false;
@@ -162,7 +187,7 @@ void App::setup() {
   if (wake_ == lb::WakeReason::Timer && g_rtc.rearmPending) {
     g_rtc.rearmPending = false;
     pirWasStuck = true;
-    const int64_t remaining = g_rtc.checkInAt - board::rtcSeconds();
+    const int64_t remaining = g_rtc.checkInAt - board::uptimeSeconds();
     if (remaining > static_cast<int64_t>(kRearmSeconds)) {
       if (board::motionNow()) {
         // Still triggered. Stay in re-arm mode even when the nap is cut short
@@ -312,9 +337,9 @@ void App::onSynced() {
   LOG("%s: %u message(s) waiting", synced_ ? "synced" : "sync timed out", static_cast<unsigned>(queue_.size()));
   phase_ = Phase::Running;
   phaseStartMs_ = millis();
-  const int64_t nowS = board::rtcSeconds();
+  const int64_t up = board::uptimeSeconds();
   if (!g_rtc.discoveryDone || wake_ == lb::WakeReason::PowerOn ||
-      nowS - g_rtc.lastDiscovery > kDiscoveryRefreshSeconds) {
+      up - g_rtc.lastDiscovery > kDiscoveryRefreshSeconds) {
     publishDiscovery();
   }
   if (synced_) publishMissingSettings();  // after a timeout we can't tell what's missing
@@ -322,8 +347,8 @@ void App::onSynced() {
   publishState();
   // Clock sync waits until nothing is on screen (its DNS lookup blocks) and
   // backs off while the server can't be reached.
-  const bool clockStale = !net::clockIsSet() || nowS - g_rtc.lastNtpSync > kNtpResyncSeconds;
-  ntpDue_ = clockStale && (wake_ == lb::WakeReason::PowerOn || nowS >= g_rtc.nextNtpAttempt);
+  const bool clockStale = !net::clockIsSet() || !g_rtc.ntpSynced || up - g_rtc.lastNtpSync > kNtpResyncSeconds;
+  ntpDue_ = clockStale && (wake_ == lb::WakeReason::PowerOn || up >= g_rtc.nextNtpAttempt);
   if (wake_ == lb::WakeReason::PowerOn) {
     showNow(internalMessage("_status", ":check: OK!", lb::colors::kGreen, lb::Effect::Scroll, 3));
   }
@@ -370,12 +395,7 @@ void App::handleMessage(const std::string& slot, const std::string& payload) {
     mqtt_.publish(topics_.event(), lb::invalidEventPayload(slot, error), false, 0);
     return;
   }
-  if (msg.sent > board::rtcSeconds()) {
-    // Home Assistant's scripts stamp messages with the time they were sent,
-    // and "now" is at least that. Keeps expiry working when NTP can't be
-    // reached, and corrects a clock that ran slow in deep sleep.
-    net::setClockAtLeast(msg.sent);
-  }
+  considerSentTime(msg.sent);
   if (!queue_.upsert(msg)) {
     LOG("queue full: dropped '%s'", slot.c_str());
     return;
@@ -383,6 +403,19 @@ void App::handleMessage(const std::string& slot, const std::string& payload) {
   LOG("message '%s': %s", slot.c_str(), msg.text.c_str());
   if (playlist_.contains(slot)) playlist_.add(*queue_.find(slot));  // update what's on screen
   stateDirty_ = true;
+}
+
+void App::considerSentTime(int64_t sent) {
+  // Home Assistant's scripts stamp messages with the time they were sent, so
+  // "now" is at least that. That corrects a clock that ran slow in deep sleep
+  // and gives a rough clock when NTP can't be reached. A clock NTP set
+  // recently is only nudged a little: a big jump means the sender's clock or
+  // format is off, and jumping would expire every waiting message.
+  const int64_t wall = net::wallClock();
+  if (sent <= wall) return;
+  const bool trusted = g_rtc.ntpSynced && board::uptimeSeconds() - g_rtc.lastNtpSync < kClockTrustSeconds;
+  if (trusted && sent - wall > kMaxSentCorrection) return;
+  net::setClockAtLeast(sent);
 }
 
 void App::handleSetting(std::string_view key, const std::string& payload) {
@@ -442,9 +475,15 @@ void App::stepRunning(uint32_t now) {
     subscribe();
   }
   drainInbox();
-  if (ntp_.active() && ntp_.poll()) {
-    g_rtc.lastNtpSync = board::rtcSeconds();
-    LOG("clock set");
+  if (ntp_.active()) {
+    if (ntp_.poll()) {
+      g_rtc.ntpSynced = true;
+      g_rtc.lastNtpSync = board::uptimeSeconds();
+      g_rtc.ntpFailures = 0;
+      LOG("clock set");
+    } else if (!ntp_.active()) {
+      ntpFailed();
+    }
   }
   if (!pendingCommand_.empty()) runCommand();
   if (now - lastExpiryCheckMs_ > kExpiryCheckMs) {
@@ -456,11 +495,18 @@ void App::stepRunning(uint32_t now) {
   queueShowableMessages(now);
   if (ntpDue_ && !showing_) {
     ntpDue_ = false;
-    g_rtc.nextNtpAttempt = board::rtcSeconds() + kNtpRetrySeconds;
     ntp_.start(LB_NTP_SERVER);
+    if (!ntp_.active()) ntpFailed();  // couldn't even send (DNS failure)
   }
   if (stateDirty_ && !showing_) publishState();
   if (!lb::keepAwake(awakeState(millis()))) goToSleep();
+}
+
+void App::ntpFailed() {
+  if (g_rtc.ntpFailures < 255) ++g_rtc.ntpFailures;
+  g_rtc.nextNtpAttempt = board::uptimeSeconds() + ntpRetrySeconds(g_rtc.ntpFailures);
+  LOG("NTP failed %u time(s); next try in %llds", g_rtc.ntpFailures,
+      static_cast<long long>(ntpRetrySeconds(g_rtc.ntpFailures)));
 }
 
 void App::pollMotion(uint32_t now) {
@@ -487,7 +533,7 @@ void App::noteMotion(uint32_t now) {
 
 void App::expireMessages() {
   if (!net::clockIsSet()) return;
-  for (const std::string& slot : queue_.expired(board::rtcSeconds())) {
+  for (const std::string& slot : queue_.expired(net::wallClock())) {
     if (const lb::Message* m = queue_.find(slot)) {
       LOG("'%s' expired", slot.c_str());
       mqtt_.publish(topics_.event(), lb::eventPayload("expired", *m), false, 0);
@@ -500,7 +546,7 @@ void App::expireMessages() {
 void App::queueShowableMessages(uint32_t now) {
   if (wiring_ || !canLight()) return;
   const bool present = lb::someonePresent(awakeState(now));
-  const int64_t clock = net::clockIsSet() ? board::rtcSeconds() : 0;
+  const int64_t clock = net::clockIsSet() ? net::wallClock() : 0;
   for (const lb::Message* m : queue_.ordered(clock)) {
     if (shownSeqs_.count(m->seq) != 0 || playlist_.contains(m->slot)) continue;
     if (!lb::mayShow(*m, present, board::hasMotionSensor())) continue;
@@ -675,7 +721,7 @@ void App::publishDiscovery() {
   info.usbSense = board::hasUsbSense();
   if (mqtt_.publish(topics_.discovery(LB_DISCOVERY_PREFIX), lb::discoveryPayload(topics_, info), true, 1)) {
     g_rtc.discoveryDone = true;
-    g_rtc.lastDiscovery = board::rtcSeconds();
+    g_rtc.lastDiscovery = board::uptimeSeconds();
     LOG("published Home Assistant discovery");
   }
 }
@@ -742,16 +788,19 @@ void App::goToSleep() {
   leds_.holdOffDuringSleep();
 
   const lb::SleepPlan plan = lb::planSleep(settings_.wakeInterval, battery_, board::hasMotionSensor());
-  g_rtc.checkInAt = board::rtcSeconds() + plan.timerSeconds;
+  g_rtc.checkInAt = board::uptimeSeconds() + plan.timerSeconds;
   LOG("sleeping %lus (motion wake %s), awake for %lums", static_cast<unsigned long>(plan.timerSeconds),
       plan.armMotion ? "on" : "off", static_cast<unsigned long>(millis()));
 #if LB_DEBUG
   Serial.flush();
 #endif
   if (plan.armMotion && board::motionNow() && plan.timerSeconds > kRearmSeconds) {
-    if (!pirHigh_) {
-      // It went off during shutdown: someone just walked up. Come straight
-      // back as a motion wake.
+    const int64_t up = board::uptimeSeconds();
+    if (!pirHigh_ && up - g_rtc.lastMotionRewake > kMotionRewakeGapSeconds) {
+      // It went off during shutdown: probably someone walking up. Come
+      // straight back as a motion wake, but not repeatedly: a PIR tripped by
+      // our own Wi-Fi traffic would otherwise keep us awake.
+      g_rtc.lastMotionRewake = up;
       g_rtc.motionPending = true;
       board::deepSleep(1, false);
     }

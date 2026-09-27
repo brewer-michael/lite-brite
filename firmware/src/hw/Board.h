@@ -22,9 +22,10 @@ uint16_t batteryMillivolts();  // averaged; 0 if there's no battery sense pin
 bool hasUsbSense();
 bool usbPower();  // false if there's no VBUS sense pin
 
-// Seconds since an arbitrary epoch that keeps counting through deep sleep
-// (it becomes real unix time once NTP has set the clock).
-int64_t rtcSeconds();
+// Seconds on the RTC counter: keeps counting through deep sleep, restarts at
+// power-on, and (unlike the wall clock) never jumps when the time is set.
+// Use it for scheduling; use the wall clock only for message expiry.
+int64_t uptimeSeconds();
 
 // Enters deep sleep. Wakes after `seconds` (0 = no timer) and, if armMotion,
 // when the PIR output goes active. Never returns.

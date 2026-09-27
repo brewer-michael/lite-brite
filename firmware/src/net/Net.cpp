@@ -17,6 +17,7 @@ constexpr uint32_t kNtpTimeoutMs = 1500;
 constexpr uint8_t kNtpAttempts = 2;
 constexpr uint32_t kNtpToUnix = 2208988800UL;  // seconds from 1900 to 1970
 constexpr time_t kPlausibleTime = 1735689600;  // 2025-01-01
+constexpr int64_t kLatestPlausibleTime = 4102444800;  // 2100-01-01
 
 void applyStaticIp() {
 #ifdef LB_STATIC_IP
@@ -69,8 +70,11 @@ int rssi() { return WiFi.RSSI(); }
 
 bool clockIsSet() { return std::time(nullptr) > kPlausibleTime; }
 
+int64_t wallClock() { return static_cast<int64_t>(std::time(nullptr)); }
+
 void setClockAtLeast(int64_t unixSeconds) {
-  if (unixSeconds <= kPlausibleTime || unixSeconds <= static_cast<int64_t>(std::time(nullptr))) return;
+  if (unixSeconds <= kPlausibleTime || unixSeconds >= kLatestPlausibleTime) return;
+  if (unixSeconds <= static_cast<int64_t>(std::time(nullptr))) return;
   timeval tv;
   tv.tv_sec = static_cast<time_t>(unixSeconds);
   tv.tv_usec = 0;

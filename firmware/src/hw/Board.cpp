@@ -2,9 +2,9 @@
 
 #include <Arduino.h>
 #include <driver/rtc_io.h>
+#include <esp_rtc_time.h>
 #include <esp_sleep.h>
 #include <soc/soc_caps.h>
-#include <sys/time.h>
 
 #include "config.h"
 
@@ -61,11 +61,7 @@ bool hasUsbSense() { return LB_PIN_VBUS >= 0; }
 
 bool usbPower() { return LB_PIN_VBUS >= 0 && digitalRead(LB_PIN_VBUS) == HIGH; }
 
-int64_t rtcSeconds() {
-  timeval tv;
-  gettimeofday(&tv, nullptr);
-  return static_cast<int64_t>(tv.tv_sec);
-}
+int64_t uptimeSeconds() { return static_cast<int64_t>(esp_rtc_get_time_us() / 1000000ULL); }
 
 void deepSleep(uint32_t seconds, bool armMotion) {
   esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);

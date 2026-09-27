@@ -70,8 +70,10 @@ sign can't use at all (broken JSON, no text) produces an `invalid` event with
 the reason, so mistakes show up in Home Assistant.
 
 **The clock and expiry:** the sign sets its clock over NTP (`LB_NTP_SERVER`,
-default `pool.ntp.org`; retried at most hourly if it fails) and from the `sent`
-time on incoming messages. Until the clock is set, nothing expires. The
+default `pool.ntp.org`; after a failure it waits 2 hours, then 4, 8, 16, and
+then retries daily) and from the `sent` time on incoming messages. A clock
+that NTP has set is only nudged by `sent` (up to 10 minutes), so a sender
+with a wrong clock can't make messages expire early. Until the clock is set, nothing expires. The
 state's `clock` field shows whether it's set. If the sign's network has no
 internet access, point `LB_NTP_SERVER` at a local NTP server (many routers
 run one). Messages carrying `sent` help, but a clock set only from `sent` can

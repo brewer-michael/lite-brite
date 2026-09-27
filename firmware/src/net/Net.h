@@ -45,8 +45,11 @@ class NtpClient {
 // True once the clock holds a plausible current time.
 bool clockIsSet();
 
+// The wall clock in unix seconds (meaningful once clockIsSet()).
+int64_t wallClock();
+
 // Moves the clock forward to `unixSeconds` if it's behind (never backward).
-// Implausible times are ignored.
+// Times before 2025 or after 2100 are ignored.
 void setClockAtLeast(int64_t unixSeconds);
 
 }  // namespace net

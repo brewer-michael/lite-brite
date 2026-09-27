@@ -47,11 +47,13 @@ class App {
   // Incoming MQTT
   void drainInbox();
   void handleMessage(const std::string& slot, const std::string& payload);
+  void considerSentTime(int64_t sent);
   void handleSetting(std::string_view key, const std::string& payload);
   void runCommand();
 
   // Running
   void stepRunning(uint32_t now);
+  void ntpFailed();
   void pollMotion(uint32_t now);
   void noteMotion(uint32_t now);
   void expireMessages();
